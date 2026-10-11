@@ -1,0 +1,82 @@
+{
+  "frames": 240,
+  "false_streak_electrodes_24": {
+    "depth_ego_motion": 0.034,
+    "homography": 0.051,
+    "none": 0.155
+  },
+  "per_grid": {
+    "outline": {
+      "16": {
+        "active_fraction": 0.323,
+        "flicker": 0.135
+      },
+      "20": {
+        "active_fraction": 0.259,
+        "flicker": 0.139
+      },
+      "24": {
+        "active_fraction": 0.221,
+        "flicker": 0.14
+      },
+      "32": {
+        "active_fraction": 0.177,
+        "flicker": 0.138
+      }
+    },
+    "outline_smoothed": {
+      "16": {
+        "active_fraction": 0.381,
+        "flicker": 0.077
+      },
+      "20": {
+        "active_fraction": 0.326,
+        "flicker": 0.081
+      },
+      "24": {
+        "active_fraction": 0.29,
+        "flicker": 0.084
+      },
+      "32": {
+        "active_fraction": 0.244,
+        "flicker": 0.085
+      }
+    },
+    "rgb_edges": {
+      "16": {
+        "active_fraction": 0.694,
+        "flicker": 0.082
+      },
+      "20": {
+        "active_fraction": 0.659,
+        "flicker": 0.113
+      },
+      "24": {
+        "active_fraction": 0.614,
+        "flicker": 0.135
+      },
+      "32": {
+        "active_fraction": 0.527,
+        "flicker": 0.162
+      }
+    },
+    "raw_image": {
+      "16": {
+        "active_fraction": 0.786,
+        "flicker": 0.05
+      },
+      "20": {
+        "active_fraction": 0.799,
+        "flicker": 0.053
+      },
+      "24": {
+        "active_fraction": 0.798,
+        "flicker": 0.057
+      },
+      "32": {
+        "active_fraction": 0.788,
+        "flicker": 0.06
+      }
+    }
+  }
+}
