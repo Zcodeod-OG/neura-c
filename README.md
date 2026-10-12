@@ -60,6 +60,23 @@ Object accuracy on 10,000 test images (chance 10%; same reader on the full 28 x 
 Run: `python3 channel/train_channel.py <fashion_mnist_dir> results/channel_results.json` (about 20 minutes on 4 CPU cores).
 A neural reader is not a person, so these are upper bounds on what a trained user could extract.
 
+### Shape-keeping encoder (`channel/train_shaped.py`, 8 training passes)
+
+The learned encoder is also penalised for drifting from the object's own silhouette (weight alpha).
+"Shape match" is the correlation between the pattern and the downsampled silhouette (1 = same shape, negative = inverted).
+
+| Grid | Code | Accuracy | Electrodes lit | Shape match |
+| --- | --- | --- | --- | --- |
+| 8x8 | Downsampled image | 83.1% | 56% | 0.97 |
+| 8x8 | Learned, unconstrained | 85.4% | 38% | -0.19 |
+| 8x8 | Learned, shape-keeping (alpha 1) | 86.2% | 44% | 0.84 |
+| 8x8 | Learned, shape-keeping (alpha 4) | 85.3% | 52% | 0.94 |
+| 20x20 | Downsampled image | 86.5% | 50% | 0.97 |
+| 20x20 | Learned, unconstrained | 87.4% | 43% | -0.43 |
+| 20x20 | Learned, shape-keeping (alpha 4) | 88.2% | 48% | 0.94 |
+
+`reading-test/` is a browser page that tests whether a person can name objects from the 8x8 codes.
+
 ## Citation
 
 Amarsh N Choudhary. Outline and Motion Encoding of RGB-D Scenes for Low-Resolution Electrotactile Vision:
