@@ -39,3 +39,22 @@ These are signal-level simulation results, not perceptual results. Nothing here 
 ## License
 
 MIT
+
+## Channel experiment: can a tactile-sized grid tell objects apart?
+
+`channel/train_channel.py` sends Fashion-MNIST objects (10 classes) through a simulated N x N electrode grid
+(4 intensity levels, noise 0.05) and trains a small reader network to name the object from the grid alone.
+Encoders: downsampled image, edge map, and a learned encoder trained jointly with the reader.
+
+Object accuracy on 10,000 test images (chance 10%; same reader on the full 28 x 28 image: 86.7%):
+
+| Grid | Raw image | Edges | Learned |
+| --- | --- | --- | --- |
+| 6x6 | 76.9% | 75.9% | 81.3% |
+| 8x8 | 80.9% | 81.8% | 83.6% |
+| 10x10 | 81.0% | 82.2% | 82.8% |
+| 14x14 | 84.3% | 84.5% | 68.5% (training unstable) |
+| 20x20 | 84.2% | 84.2% | 81.5% |
+
+Run: `python3 channel/train_channel.py <fashion_mnist_dir> results/channel_results.json` (about 20 minutes on 4 CPU cores).
+A neural reader is not a person, so these are upper bounds on what a trained user could extract.
