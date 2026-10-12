@@ -1,0 +1,212 @@
+<title>Grid Reading Test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;600&display=swap">
+<style>
+/* Layout: one centred instrument panel; a stage for the electrode grid, choices beneath, progress along the top */
+:root {
+  --bg: #eef0ec; --panel: #f9faf7; --ink: #1d2320; --muted: #5d6862; --line: #d3d8d2;
+  --accent: #2f6f5e; --accent-ink: #ffffff; --skin: #2a2f2c; --dot-off: #4a524d; --good: #2f7d4a; --bad: #b0412e;
+  --display: "Fraunces", Georgia, serif; --body: "Public Sans", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #141816; --panel: #1c211e; --ink: #e6ebe7; --muted: #9aa59f; --line: #2f3632;
+  --accent: #6fbfa5; --accent-ink: #0f1412; --skin: #0d100e; --dot-off: #39403b; --good: #6cc48a; --bad: #e58a74; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #141816; --panel: #1c211e; --ink: #e6ebe7; --muted: #9aa59f; --line: #2f3632;
+  --accent: #6fbfa5; --accent-ink: #0f1412; --skin: #0d100e; --dot-off: #39403b; --good: #6cc48a; --bad: #e58a74; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 760px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 48px; display: grid; gap: 20px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(1.7rem, 4vw, 2.3rem); line-height: 1.15; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--display); font-weight: 500; font-size: 1.3rem; margin: 0; text-wrap: balance; }
+p { margin: 0; max-width: 65ch; }
+.muted { color: var(--muted); }
+.eyebrow { font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px; display: grid; gap: 16px; min-width: 0; }
+.bar { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .25s; }
+.stage { display: grid; place-items: center; }
+canvas.big { width: min(260px, 70vw); aspect-ratio: 1; max-width: 100%; border-radius: 8px; background: var(--skin); }
+.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+button { font: inherit; cursor: pointer; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 10px 12px; }
+button:hover { border-color: var(--accent); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; justify-self: start; padding-inline: 20px; }
+button.right { border-color: var(--good); box-shadow: inset 0 0 0 1px var(--good); }
+button.wrong { border-color: var(--bad); box-shadow: inset 0 0 0 1px var(--bad); }
+.study { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 12px; }
+.study figure { margin: 0; display: grid; gap: 6px; justify-items: center; }
+.study canvas { width: 100%; aspect-ratio: 1; max-width: 140px; border-radius: 6px; background: var(--skin); }
+.study figcaption { font-size: 0.85rem; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 18px; font-family: var(--mono); font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.feedback { min-height: 1.5em; font-weight: 600; }
+.feedback.ok { color: var(--good); } .feedback.no { color: var(--bad); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+th { font-family: var(--mono); font-size: 0.75rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 400; }
+textarea { width: 100%; min-height: 110px; font-family: var(--mono); font-size: 0.8rem; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 7px; padding: 10px; box-sizing: border-box; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+@media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:8px">
+    <div class="eyebrow">Neura-C · 8 × 8 electrode grid · 4 intensity levels</div>
+    <h1>Can you read the grid?</h1>
+    <p class="muted">Each pattern is what an 8 × 8 tactile array (forehead-sized) would show for one object. There are three codes, presented blind as Code A, B and C. For each, you study one labelled example per object, then name 20 unseen patterns. It takes about 10 minutes.</p>
+  </header>
+
+  <div class="bar" aria-hidden="true"><i id="progress"></i></div>
+
+  <section class="panel" id="intro">
+    <h2>How it works</h2>
+    <p>Bright dots are active electrodes; brighter means stronger. Chance is 1 in 10. Go with your first impression, since speed matters for a real device too. Your answers stay in this page; at the end you copy a short summary back to Claude.</p>
+    <button class="primary" id="start">Start with Code A</button>
+    <p class="muted" id="loadmsg"></p>
+  </section>
+
+  <section class="panel" id="studyPanel" hidden>
+    <div class="eyebrow" id="studyLabel"></div>
+    <h2>Study these, then start the test</h2>
+    <div class="study" id="studyGrid"></div>
+    <button class="primary" id="beginTest">I'm ready, start 20 trials</button>
+  </section>
+
+  <section class="panel" id="trialPanel" hidden>
+    <div class="meta"><span id="trialCode"></span><span id="trialCount"></span><span id="trialScore"></span></div>
+    <div class="stage"><canvas class="big" id="trialCanvas" width="320" height="320" aria-label="Electrode pattern to identify"></canvas></div>
+    <div class="feedback" id="feedback" aria-live="polite"></div>
+    <div class="choices" id="choices"></div>
+  </section>
+
+  <section class="panel" id="resultPanel" hidden>
+    <h2>Your results</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Code</th><th>What it was</th><th>Correct</th><th>Accuracy</th><th>Median time</th></tr></thead>
+      <tbody id="resultBody"></tbody>
+    </table></div>
+    <p class="muted">The reader network's accuracy on the same codes is listed for comparison. Copy the summary below and paste it in the thread.</p>
+    <textarea id="summary" readonly></textarea>
+    <div class="row"><button class="primary" id="copy">Copy summary</button><span class="muted" id="copyMsg"></span></div>
+  </section>
+</div>
+
+<script>
+const CODES = [
+  { key: "raw_8", name: "Downsampled image" },
+  { key: "learned_8_a4", name: "Learned, shape-keeping" },
+  { key: "learned_8_a0", name: "Learned, unconstrained" },
+];
+const TRIALS = 20;
+let data, order, blockIdx = 0, trials = [], t = 0, startTime = 0, results = [];
+const $ = (id) => document.getElementById(id);
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+function draw(canvas, pat) {
+  const ctx = canvas.getContext("2d"), n = pat.length, w = canvas.width, c = w / n;
+  ctx.fillStyle = css("--skin"); ctx.fillRect(0, 0, w, w);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const v = pat[y][x], cx = (x + .5) * c, cy = (y + .5) * c;
+    ctx.beginPath();
+    if (v > 0) { const l = Math.round(90 + 165 * v); ctx.fillStyle = `rgb(${l},${l},${l})`; ctx.arc(cx, cy, c * .42, 0, 7); }
+    else { ctx.fillStyle = css("--dot-off"); ctx.arc(cx, cy, c * .1, 0, 7); }
+    ctx.fill();
+  }
+}
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function setProgress() {
+  const done = blockIdx * TRIALS + (trials.length ? t : 0);
+  $("progress").style.width = (100 * done / (CODES.length * TRIALS)) + "%";
+}
+function letter(i) { return "Code " + "ABC"[i]; }
+
+async function load() {
+  try {
+    const r = await fetch("patterns.json");
+    data = await r.json();
+    order = shuffle(CODES.map((_, i) => i));
+  } catch (e) {
+    $("loadmsg").textContent = "The patterns could not load. Reload the page; if it persists, tell Claude in the thread.";
+    $("start").disabled = true;
+  }
+}
+
+function showStudy() {
+  const code = CODES[order[blockIdx]], pats = data.runs[code.key].patterns, labels = data.export_labels;
+  $("intro").hidden = true; $("trialPanel").hidden = true; $("studyPanel").hidden = false;
+  $("studyLabel").textContent = `${letter(blockIdx)} · study`;
+  const g = $("studyGrid"); g.innerHTML = "";
+  data.classes.forEach((name, c) => {
+    const i = labels.indexOf(c);           // first example of each class is the study item
+    const fig = document.createElement("figure"), cv = document.createElement("canvas");
+    cv.width = cv.height = 160; draw(cv, pats[i]);
+    const cap = document.createElement("figcaption"); cap.textContent = name;
+    fig.append(cv, cap); g.append(fig);
+  });
+  const pool = labels.map((l, i) => i).filter((i) => labels.indexOf(labels[i]) !== i);
+  trials = shuffle(pool).slice(0, TRIALS).map((i) => ({ i, label: labels[i] }));
+  t = 0; results[blockIdx] = { code: code.key, name: code.name, letter: letter(blockIdx), answers: [] };
+  setProgress();
+}
+
+function showTrial() {
+  $("studyPanel").hidden = true; $("trialPanel").hidden = false; $("feedback").textContent = ""; $("feedback").className = "feedback";
+  const code = CODES[order[blockIdx]], tr = trials[t];
+  draw($("trialCanvas"), data.runs[code.key].patterns[tr.i]);
+  $("trialCode").textContent = letter(blockIdx);
+  $("trialCount").textContent = `Trial ${t + 1} of ${TRIALS}`;
+  const right = results[blockIdx].answers.filter((a) => a.correct).length;
+  $("trialScore").textContent = `${right} correct so far`;
+  const ch = $("choices"); ch.innerHTML = "";
+  data.classes.forEach((name, c) => {
+    const b = document.createElement("button"); b.textContent = name; b.id = "choice-" + c;
+    b.onclick = () => answer(c, b); ch.append(b);
+  });
+  startTime = performance.now(); setProgress();
+}
+
+function answer(c, btn) {
+  const tr = trials[t], ok = c === tr.label;
+  results[blockIdx].answers.push({ truth: tr.label, said: c, correct: ok, ms: Math.round(performance.now() - startTime) });
+  [...$("choices").children].forEach((b) => (b.disabled = true));
+  btn.classList.add(ok ? "right" : "wrong");
+  if (!ok) $("choice-" + tr.label).classList.add("right");
+  $("feedback").textContent = ok ? "Correct" : `It was ${data.classes[tr.label]}`;
+  $("feedback").className = "feedback " + (ok ? "ok" : "no");
+  setTimeout(() => {
+    t++;
+    if (t < TRIALS) return showTrial();
+    blockIdx++; trials = [];
+    if (blockIdx < CODES.length) return showStudy();
+    showResults();
+  }, ok ? 450 : 1100);
+}
+
+function median(a) { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; }
+function showResults() {
+  $("trialPanel").hidden = true; $("studyPanel").hidden = true; $("resultPanel").hidden = false;
+  $("progress").style.width = "100%";
+  const body = $("resultBody"); body.innerHTML = ""; const lines = ["Neura-C grid reading test, 8x8, 4 levels"];
+  results.forEach((r) => {
+    const n = r.answers.length, k = r.answers.filter((a) => a.correct).length, med = median(r.answers.map((a) => a.ms));
+    const net = data.runs[r.code].accuracy;
+    const tr = document.createElement("tr");
+    [r.letter, r.name, `${k} / ${n}`, `${Math.round(100 * k / n)}%`, `${(med / 1000).toFixed(1)} s`].forEach((v) => {
+      const td = document.createElement("td"); td.textContent = v; tr.append(td);
+    });
+    body.append(tr);
+    lines.push(`${r.letter} = ${r.code}: ${k}/${n} correct (${Math.round(100 * k / n)}%), median ${(med / 1000).toFixed(1)} s, network ${Math.round(100 * net)}%`);
+    lines.push("  answers (truth>said): " + r.answers.map((a) => `${a.truth}>${a.said}`).join(" "));
+  });
+  $("summary").value = lines.join("\n");
+}
+
+$("start").onclick = () => data && showStudy();
+$("beginTest").onclick = showTrial;
+$("copy").onclick = () => {
+  const txt = $("summary").value;
+  navigator.clipboard.writeText(txt).then(() => ($("copyMsg").textContent = "Copied"),
+    () => { $("summary").select(); $("copyMsg").textContent = "Select-all is on; copy it with your keyboard"; });
+};
+load();
+</script>
