@@ -1,7 +1,8 @@
 # Neura-C: outline and motion encoding for low-resolution electrotactile vision
 
 Code for the preprint *Outline and Motion Encoding of RGB-D Scenes for Low-Resolution Electrotactile
-Vision: A Simulation Study* (Amarsh N Choudhary, IIT Delhi, 2026).
+Vision: A Simulation Study* (Amarsh N Choudhary, IIT Delhi, 2026),
+[doi:10.5281/zenodo.23317774](https://doi.org/10.5281/zenodo.23317774).
 
 The simulator turns RGB-D video into a sparse line drawing (depth outlines weighted by nearness, plus speed
 streaks behind moving objects), removes the wearer's own camera motion using depth, and renders the result on a
@@ -58,3 +59,8 @@ Object accuracy on 10,000 test images (chance 10%; same reader on the full 28 x 
 
 Run: `python3 channel/train_channel.py <fashion_mnist_dir> results/channel_results.json` (about 20 minutes on 4 CPU cores).
 A neural reader is not a person, so these are upper bounds on what a trained user could extract.
+
+## Citation
+
+Amarsh N Choudhary. Outline and Motion Encoding of RGB-D Scenes for Low-Resolution Electrotactile Vision:
+A Simulation Study. Zenodo preprint, 2026. https://doi.org/10.5281/zenodo.23317774
