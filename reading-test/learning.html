@@ -1,0 +1,365 @@
+<title>Grid Reading Practice</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;600&display=swap">
+<style>
+/* Layout: same instrument panel as the first reading test; a learning-curve chart on top, the session runner below */
+:root {
+  --bg: #eef0ec; --panel: #f9faf7; --ink: #1d2320; --muted: #5d6862; --line: #d3d8d2;
+  --accent: #2f6f5e; --accent-ink: #ffffff; --skin: #2a2f2c; --dot-off: #4a524d; --good: #2f7d4a; --bad: #b0412e;
+  --series-a: #2f6f5e; --series-b: #9a6a1f;
+  --display: "Fraunces", Georgia, serif; --body: "Public Sans", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #141816; --panel: #1c211e; --ink: #e6ebe7; --muted: #9aa59f; --line: #2f3632;
+  --accent: #6fbfa5; --accent-ink: #0f1412; --skin: #0d100e; --dot-off: #39403b; --good: #6cc48a; --bad: #e58a74;
+  --series-a: #6fbfa5; --series-b: #e0ad5c; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #141816; --panel: #1c211e; --ink: #e6ebe7; --muted: #9aa59f; --line: #2f3632;
+  --accent: #6fbfa5; --accent-ink: #0f1412; --skin: #0d100e; --dot-off: #39403b; --good: #6cc48a; --bad: #e58a74;
+  --series-a: #6fbfa5; --series-b: #e0ad5c; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 760px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 48px; display: grid; gap: 20px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(1.7rem, 4vw, 2.3rem); line-height: 1.15; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--display); font-weight: 500; font-size: 1.3rem; margin: 0; text-wrap: balance; }
+p { margin: 0; max-width: 65ch; }
+.muted { color: var(--muted); }
+.eyebrow { font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px; display: grid; gap: 16px; min-width: 0; }
+.bar { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .25s; }
+.stage { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; align-items: center; }
+canvas.big { width: min(240px, 64vw); aspect-ratio: 1; max-width: 100%; border-radius: 8px; background: var(--skin); }
+canvas.thumb { width: 96px; aspect-ratio: 1; border-radius: 6px; background: var(--skin); }
+.reveal { display: grid; gap: 4px; justify-items: center; font-size: 0.8rem; color: var(--muted); }
+.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+button { font: inherit; cursor: pointer; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 10px 12px; }
+button:hover { border-color: var(--accent); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:disabled { cursor: default; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; justify-self: start; padding-inline: 20px; }
+button.right { border-color: var(--good); box-shadow: inset 0 0 0 1px var(--good); }
+button.wrong { border-color: var(--bad); box-shadow: inset 0 0 0 1px var(--bad); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; background: transparent; padding: 8px 14px; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.study { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 12px; }
+.study figure { margin: 0; display: grid; gap: 6px; justify-items: center; }
+.study canvas { width: 100%; aspect-ratio: 1; max-width: 120px; border-radius: 6px; background: var(--skin); }
+.study figcaption { font-size: 0.82rem; text-align: center; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 18px; font-family: var(--mono); font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.phase { font-family: var(--mono); font-size: 0.72rem; letter-spacing: .08em; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); }
+.phase.test { border-color: var(--accent); color: var(--accent); }
+.feedback { min-height: 1.5em; font-weight: 600; text-align: center; }
+.feedback.ok { color: var(--good); } .feedback.no { color: var(--bad); } .feedback.neutral { color: var(--muted); font-weight: 400; }
+.chartwrap { overflow-x: auto; }
+svg.chart { width: 100%; min-width: 300px; height: auto; display: block; }
+svg.chart text { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.85rem; }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; background: var(--c); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-family: var(--mono); font-size: 0.72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 400; }
+textarea { width: 100%; min-height: 110px; font-family: var(--mono); font-size: 0.8rem; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 7px; padding: 10px; box-sizing: border-box; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.empty { border: 1px dashed var(--line); border-radius: 8px; padding: 18px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:8px">
+    <div class="eyebrow">Neura-C · 8 × 8 electrode grid · 4 intensity levels</div>
+    <h1>Does reading the grid get easier with practice?</h1>
+    <p class="muted">Do one short session a day for about a week. Each session trains you on two codes with feedback, then tests you on patterns you have never seen. The chart tracks your test score per session. If it climbs toward the reader network's score, people can learn the code.</p>
+  </header>
+
+  <section class="panel" id="curvePanel">
+    <div class="row" style="justify-content:space-between">
+      <h2>Your learning curve</h2>
+      <div class="seg" role="group" aria-label="Task">
+        <button id="mode10" aria-pressed="true">10 objects</button><button id="mode4" aria-pressed="false">4 groups</button>
+      </div>
+    </div>
+    <div id="curveBody"></div>
+  </section>
+
+  <div class="bar" aria-hidden="true"><i id="progress"></i></div>
+
+  <section class="panel" id="intro">
+    <h2 id="introTitle">Session 1</h2>
+    <p id="introText">Each session runs both codes, about 5 minutes in all. For each code you look over one labelled example per object, then do 24 practice patterns, where every answer shows the right object and the original image. After that come 12 test patterns with no feedback. Only the test patterns go into the chart.</p>
+    <p class="muted" id="modeNote"></p>
+    <button class="primary" id="start" disabled>Start session</button>
+    <p class="muted" id="loadmsg">Loading patterns…</p>
+  </section>
+
+  <section class="panel" id="studyPanel" hidden>
+    <div class="eyebrow" id="studyLabel"></div>
+    <h2>Look these over, then start practice</h2>
+    <div class="study" id="studyGrid"></div>
+    <button class="primary" id="beginPractice">Start practice</button>
+  </section>
+
+  <section class="panel" id="trialPanel" hidden>
+    <div class="meta"><span class="phase" id="phase"></span><span id="trialCode"></span><span id="trialCount"></span></div>
+    <div class="stage">
+      <canvas class="big" id="trialCanvas" width="320" height="320" aria-label="Electrode pattern to identify"></canvas>
+      <div class="reveal" id="reveal" hidden><canvas class="thumb" id="thumb" width="112" height="112" aria-label="Original image"></canvas><span>Original image</span></div>
+    </div>
+    <div class="feedback" id="feedback" aria-live="polite"></div>
+    <div class="choices" id="choices"></div>
+  </section>
+
+  <section class="panel" id="betweenPanel" hidden>
+    <h2 id="betweenTitle"></h2>
+    <p id="betweenText"></p>
+    <button class="primary" id="betweenGo"></button>
+  </section>
+
+  <section class="panel" id="resultPanel" hidden>
+    <h2>Session done</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Code</th><th>Practice</th><th>Test</th><th>Test median time</th></tr></thead>
+      <tbody id="resultBody"></tbody>
+    </table></div>
+    <p class="muted" id="saveMsg"></p>
+    <textarea id="summary" readonly aria-label="Session summary"></textarea>
+    <div class="row"><button id="copy">Copy summary</button><button class="primary" id="again">Back to the chart</button><span class="muted" id="copyMsg"></span></div>
+  </section>
+</div>
+
+<script>
+const CODES = [
+  { key: "learned_8_a4", name: "Shape-keeping", net: 0.853, color: "--series-a" },
+  { key: "raw_8", name: "Downsampled", net: 0.831, color: "--series-b" },
+];
+const GROUP = [0, 1, 0, 0, 0, 2, 0, 2, 3, 2];             // T-shirt..Ankle boot -> top/bottom/shoe/bag
+const GROUPS = ["Top", "Bottom", "Shoe", "Bag"];
+const PRACTICE = 24, TEST = 12, PER_CLASS = 50, TEST_FROM = 40;  // images 0-39 per class train, 40-49 test
+const $ = (id) => document.getElementById(id);
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+let data, mode = 10, sessions = [], db = null, userId = "local";
+let order, blockIdx, trials, t, startTime, blocks, phase, codeLetters;
+
+function store(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || "null"); localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
+
+function draw(canvas, pat) {
+  const ctx = canvas.getContext("2d"), n = pat.length, w = canvas.width, c = w / n;
+  ctx.fillStyle = css("--skin"); ctx.fillRect(0, 0, w, w);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const v = pat[y][x] / 3, cx = (x + .5) * c, cy = (y + .5) * c;
+    ctx.beginPath();
+    if (v > 0) { const l = Math.round(90 + 165 * v); ctx.fillStyle = `rgb(${l},${l},${l})`; ctx.arc(cx, cy, c * .42, 0, 7); }
+    else { ctx.fillStyle = css("--dot-off"); ctx.arc(cx, cy, c * .1, 0, 7); }
+    ctx.fill();
+  }
+}
+function drawThumb(canvas, hex) {
+  const ctx = canvas.getContext("2d"), img = ctx.createImageData(14, 14);
+  for (let i = 0; i < 196; i++) { const v = parseInt(hex.substr(i * 2, 2), 16); img.data.set([v, v, v, 255], i * 4); }
+  const off = document.createElement("canvas"); off.width = off.height = 14; off.getContext("2d").putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = false; ctx.drawImage(off, 0, 0, canvas.width, canvas.height);
+}
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function median(a) { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; }
+const pct = (k, n) => n ? Math.round(100 * k / n) : 0;
+const answerOf = (cls) => mode === 4 ? GROUP[cls] : cls;
+const choiceNames = () => mode === 4 ? GROUPS : data.classes;
+
+// Indices into the bank: per class, the first TEST_FROM images are for study and practice, the rest for testing.
+function poolFor(test) {
+  const out = [];
+  data.labels.forEach((l, i) => { const k = i % PER_CLASS; if (test ? k >= TEST_FROM : k > 0 && k < TEST_FROM) out.push(i); });
+  return out;
+}
+// Draw n trials balanced over answers (classes in 10-way, groups in 4-way)
+function drawTrials(test, n) {
+  const pool = shuffle(poolFor(test)), byAns = {};
+  pool.forEach((i) => (byAns[answerOf(data.labels[i])] ||= []).push(i));
+  const keys = Object.keys(byAns), out = [];
+  for (let j = 0; j < n; j++) out.push(byAns[keys[j % keys.length]].pop());
+  return shuffle(out).map((i) => ({ i, cls: data.labels[i], truth: answerOf(data.labels[i]) }));
+}
+
+// ---------- learning curve ----------
+function modeSessions() { return sessions.filter((s) => s.mode === mode).sort((a, b) => a.ts - b.ts); }
+function renderCurve() {
+  const list = modeSessions(), body = $("curveBody"), chance = mode === 4 ? 25 : 10;
+  $("modeNote").textContent = mode === 4
+    ? "4-group task: name whether each pattern is a top, a bottom, a shoe or a bag. Chance is 25%."
+    : "10-object task: name the exact object. Chance is 10%.";
+  $("introTitle").textContent = `Session ${list.length + 1} · ${mode === 4 ? "4 groups" : "10 objects"}`;
+  if (!list.length) {
+    body.innerHTML = `<div class="empty">No ${mode === 4 ? "4-group" : "10-object"} sessions yet. Your test score for each code will appear here after your first session, one point per session.${mode === 10 ? " For reference, your first reading test on 12 October scored 55% on the shape-keeping code and 45% on the downsampled one." : ""}</div>`;
+    return;
+  }
+  const W = 640, H = 260, L = 40, R = 16, T = 14, B = 34, n = Math.max(list.length, 5);
+  const x = (i) => L + (W - L - R) * (n === 1 ? 0.5 : i / (n - 1)), y = (v) => T + (H - T - B) * (1 - v / 100);
+  let svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Test accuracy per session">`;
+  [0, 25, 50, 75, 100].forEach((v) => { svg += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="${css("--line")}" stroke-width="1"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}%</text>`; });
+  svg += `<line x1="${L}" x2="${W - R}" y1="${y(chance)}" y2="${y(chance)}" stroke="${css("--muted")}" stroke-dasharray="3 4"/><text x="${W - R}" y="${y(chance) - 5}" text-anchor="end">chance</text>`;
+  for (let i = 0; i < n; i++) svg += `<text x="${x(i)}" y="${H - 12}" text-anchor="middle">${i + 1}</text>`;
+  CODES.forEach((c) => {
+    const col = css(c.color);
+    if (mode === 10) svg += `<line x1="${L}" x2="${W - R}" y1="${y(100 * c.net)}" y2="${y(100 * c.net)}" stroke="${col}" stroke-opacity=".45" stroke-dasharray="1 4" stroke-width="2"/>`;
+    const pts = list.map((s, i) => { const b = s.blocks.find((b) => b.code === c.key); return b ? [x(i), y(pct(b.testK, b.testN))] : null; }).filter(Boolean);
+    if (pts.length > 1) svg += `<polyline fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" points="${pts.map((p) => p.join(",")).join(" ")}"/>`;
+    pts.forEach((p, i) => { svg += `<circle cx="${p[0]}" cy="${p[1]}" r="${i === pts.length - 1 ? 5 : 3.5}" fill="${col}"/>`; });
+  });
+  svg += `</svg>`;
+  const legend = CODES.map((c) => `<span style="--c:var(${c.color})">${c.name}</span>`).join("") + (mode === 10 ? `<span class="muted" style="--c:transparent">Dotted lines: reader network</span>` : "");
+  const rows = list.map((s, i) => `<tr><td>${i + 1}</td><td>${new Date(s.ts).toLocaleDateString(undefined, { day: "numeric", month: "short" })}</td>${CODES.map((c) => { const b = s.blocks.find((b) => b.code === c.key); return `<td>${b ? `${pct(b.testK, b.testN)}% (${b.testK}/${b.testN})` : "–"}</td>`; }).join("")}</tr>`).join("");
+  body.innerHTML = `<div class="chartwrap">${svg}</div><div class="legend">${legend}</div>
+    <div class="tablewrap"><table><thead><tr><th>Session</th><th>Date</th>${CODES.map((c) => `<th>${c.name}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function setMode(m) {
+  mode = m; $("mode10").setAttribute("aria-pressed", m === 10); $("mode4").setAttribute("aria-pressed", m === 4);
+  store("neurac-mode", m); renderCurve();
+}
+
+// ---------- session flow ----------
+function show(id) { ["intro", "studyPanel", "trialPanel", "betweenPanel", "resultPanel"].forEach((p) => ($(p).hidden = p !== id)); $("curvePanel").hidden = id !== "intro"; }
+function setProgress() {
+  const per = PRACTICE + TEST, done = blockIdx * per + (phase === "test" ? PRACTICE : 0) + t;
+  $("progress").style.width = (100 * done / (CODES.length * per)) + "%";
+}
+function startSession() {
+  order = shuffle(CODES.map((_, i) => i)); blockIdx = 0; blocks = [];
+  codeLetters = ["Code X", "Code Y"];
+  showStudy();
+}
+function showStudy() {
+  const code = CODES[order[blockIdx]], pats = data.runs[code.key];
+  $("studyLabel").textContent = `${codeLetters[blockIdx]} · ${blockIdx + 1} of ${CODES.length}`;
+  const g = $("studyGrid"); g.innerHTML = "";
+  data.classes.forEach((name, c) => {
+    const i = c * PER_CLASS;   // first image of each class is the reference
+    const fig = document.createElement("figure"), cv = document.createElement("canvas");
+    cv.width = cv.height = 140; draw(cv, pats[i]);
+    const cap = document.createElement("figcaption"); cap.textContent = mode === 4 ? `${GROUPS[GROUP[c]]} · ${name}` : name;
+    fig.append(cv, cap); g.append(fig);
+  });
+  blocks[blockIdx] = { code: code.key, letter: codeLetters[blockIdx], practice: [], test: [] };
+  phase = "practice"; t = 0; trials = drawTrials(false, PRACTICE);
+  show("studyPanel"); setProgress();
+}
+function showTrial() {
+  show("trialPanel");
+  $("feedback").textContent = ""; $("feedback").className = "feedback"; $("reveal").hidden = true;
+  const code = CODES[order[blockIdx]], tr = trials[t], n = phase === "test" ? TEST : PRACTICE;
+  draw($("trialCanvas"), data.runs[code.key][tr.i]);
+  $("phase").textContent = phase; $("phase").className = "phase " + phase;
+  $("trialCode").textContent = codeLetters[blockIdx];
+  $("trialCount").textContent = `${t + 1} of ${n}`;
+  const ch = $("choices"); ch.innerHTML = "";
+  choiceNames().forEach((name, c) => {
+    const b = document.createElement("button"); b.textContent = name; b.id = "choice-" + c;
+    b.onclick = () => answer(c, b); ch.append(b);
+  });
+  startTime = performance.now(); setProgress();
+}
+function answer(c, btn) {
+  const tr = trials[t], ok = c === tr.truth, ms = Math.round(performance.now() - startTime);
+  blocks[blockIdx][phase].push({ truth: tr.truth, said: c, cls: tr.cls, ok, ms });
+  [...$("choices").children].forEach((b) => (b.disabled = true));
+  let wait = 350;
+  if (phase === "practice") {
+    btn.classList.add(ok ? "right" : "wrong");
+    if (!ok) $("choice-" + tr.truth).classList.add("right");
+    $("feedback").textContent = ok ? `Correct: ${data.classes[tr.cls]}` : `It was ${data.classes[tr.cls]}`;
+    $("feedback").className = "feedback " + (ok ? "ok" : "no");
+    drawThumb($("thumb"), data.thumbs[tr.i]); $("reveal").hidden = false;
+    wait = ok ? 900 : 1800;
+  } else {
+    $("feedback").textContent = "Saved"; $("feedback").className = "feedback neutral";
+  }
+  setTimeout(next, wait);
+}
+function next() {
+  t++;
+  if (phase === "practice" && t < PRACTICE) return showTrial();
+  if (phase === "practice") {
+    const k = blocks[blockIdx].practice.filter((a) => a.ok).length;
+    $("betweenTitle").textContent = `Practice done: ${k} of ${PRACTICE}`;
+    $("betweenText").textContent = `Now ${TEST} test patterns you have not seen before. There is no feedback, so go with your first read.`;
+    $("betweenGo").textContent = "Start the test";
+    $("betweenGo").onclick = () => { phase = "test"; t = 0; trials = drawTrials(true, TEST); showTrial(); };
+    return show("betweenPanel");
+  }
+  if (t < TEST) return showTrial();
+  blockIdx++;
+  if (blockIdx < CODES.length) {
+    $("betweenTitle").textContent = `${codeLetters[blockIdx - 1]} done`;
+    $("betweenText").textContent = `Next is ${codeLetters[blockIdx]}, a different code for the same objects.`;
+    $("betweenGo").textContent = `Look over ${codeLetters[blockIdx]}`;
+    $("betweenGo").onclick = showStudy;
+    return show("betweenPanel");
+  }
+  finish();
+}
+
+async function finish() {
+  $("progress").style.width = "100%";
+  const s = {
+    ts: Date.now(), mode, user: userId,
+    blocks: blocks.map((b) => ({
+      code: b.code, practiceK: b.practice.filter((a) => a.ok).length, practiceN: b.practice.length,
+      testK: b.test.filter((a) => a.ok).length, testN: b.test.length, testMedianMs: median(b.test.map((a) => a.ms)),
+      test: b.test.map((a) => `${a.cls}>${a.said}`).join(" "),
+    })),
+  };
+  sessions.push(s); store("neurac-sessions", sessions);
+  const num = modeSessions().length;
+  const body = $("resultBody"); body.innerHTML = "";
+  const lines = [`Neura-C learning session ${num}, ${mode === 4 ? "4 groups" : "10 objects"}, ${new Date(s.ts).toISOString().slice(0, 10)}`];
+  s.blocks.forEach((b) => {
+    const name = CODES.find((c) => c.key === b.code).name, tr = document.createElement("tr");
+    [name, `${b.practiceK} / ${b.practiceN} (${pct(b.practiceK, b.practiceN)}%)`, `${b.testK} / ${b.testN} (${pct(b.testK, b.testN)}%)`, `${(b.testMedianMs / 1000).toFixed(1)} s`]
+      .forEach((v) => { const td = document.createElement("td"); td.textContent = v; tr.append(td); });
+    body.append(tr);
+    lines.push(`${b.code}: practice ${b.practiceK}/${b.practiceN}, test ${b.testK}/${b.testN} (${pct(b.testK, b.testN)}%), median ${(b.testMedianMs / 1000).toFixed(1)} s; test ${mode === 4 ? "class>group said" : "truth>said"}: ${b.test}`);
+  });
+  $("summary").value = lines.join("\n");
+  show("resultPanel");
+  $("saveMsg").textContent = "Saving…";
+  if (!db) { $("saveMsg").textContent = "Saved in this browser only. Copy the summary into the thread so Claude has it."; return; }
+  try { await db.collection("sessions").doc(String(s.ts)).set(s); $("saveMsg").textContent = "Saved. Claude can read it, so there's nothing to paste. The summary is here if you want it."; }
+  catch (e) { $("saveMsg").textContent = "Could not save online, so it is kept in this browser only. Copy the summary into the thread."; }
+}
+
+async function connect() {
+  try {
+    const user = await window.claude?.use?.("user");
+    if (user) userId = (await user.id()) || "local";
+    db = await window.claude?.use?.("db");
+    if (!db) return;
+    const snap = await db.collection("sessions").get();
+    const known = new Set(sessions.map((s) => s.ts));
+    snap.docs.forEach((d) => { const v = d.data(); if (v && !known.has(v.ts)) sessions.push(v); });
+    store("neurac-sessions", sessions); renderCurve();
+  } catch (e) { db = null; }
+}
+
+async function load() {
+  sessions = store("neurac-sessions") || [];
+  const m = store("neurac-mode"); if (m === 4 || m === 10) mode = m;
+  setMode(mode);
+  try {
+    data = await (await fetch("learning_patterns.json")).json();
+    $("start").disabled = false; $("loadmsg").textContent = "";
+  } catch (e) { $("loadmsg").textContent = "The patterns could not load. Reload the page; if it keeps happening, say so in the thread."; }
+  connect();
+}
+
+$("mode10").onclick = () => setMode(10);
+$("mode4").onclick = () => setMode(4);
+$("start").onclick = () => data && startSession();
+$("beginPractice").onclick = showTrial;
+$("again").onclick = () => { $("progress").style.width = "0"; renderCurve(); show("intro"); };
+$("copy").onclick = () => {
+  navigator.clipboard.writeText($("summary").value).then(() => ($("copyMsg").textContent = "Copied"),
+    () => { $("summary").select(); $("copyMsg").textContent = "Text selected; copy it with your keyboard"; });
+};
+load();
+</script>
