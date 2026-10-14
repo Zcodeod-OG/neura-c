@@ -40,12 +40,13 @@ button:disabled { cursor: default; }
 button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; justify-self: start; padding-inline: 20px; }
 button.right { border-color: var(--good); box-shadow: inset 0 0 0 1px var(--good); }
 button.wrong { border-color: var(--bad); box-shadow: inset 0 0 0 1px var(--bad); }
-.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .seg button { border: 0; border-radius: 0; background: transparent; padding: 8px 14px; }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .study { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 12px; }
 .study figure { margin: 0; display: grid; gap: 6px; justify-items: center; }
 .study canvas { width: 100%; aspect-ratio: 1; max-width: 120px; border-radius: 6px; background: var(--skin); }
+.study canvas.ref { width: 44px; max-width: 44px; border-radius: 4px; }
 .study figcaption { font-size: 0.82rem; text-align: center; }
 .meta { display: flex; flex-wrap: wrap; gap: 8px 18px; font-family: var(--mono); font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .phase { font-family: var(--mono); font-size: 0.72rem; letter-spacing: .08em; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); }
@@ -78,7 +79,7 @@ textarea { width: 100%; min-height: 110px; font-family: var(--mono); font-size: 
     <div class="row" style="justify-content:space-between">
       <h2>Your learning curve</h2>
       <div class="seg" role="group" aria-label="Task">
-        <button id="mode10" aria-pressed="true">10 objects</button><button id="mode4" aria-pressed="false">4 groups</button>
+        <button id="mode10" aria-pressed="true">Clothing, 10</button><button id="mode4" aria-pressed="false">Clothing, 4 groups</button><button id="mode3d" aria-pressed="false">3D objects</button>
       </div>
     </div>
     <div id="curveBody"></div>
@@ -130,16 +131,31 @@ textarea { width: 100%; min-height: 110px; font-family: var(--mono); font-size: 
 </div>
 
 <script>
-const CODES = [
+// Each task: which pattern bank it reads and which two codes a session compares (net = reader network accuracy)
+const CLOTHING = [
   { key: "learned_8_a4", name: "Shape-keeping", net: 0.853, color: "--series-a" },
   { key: "raw_8", name: "Downsampled", net: 0.831, color: "--series-b" },
 ];
+const CODES3D = [
+  { key: "learned_8_a4", name: "Shape-keeping", net: 0, color: "--series-a" },
+  { key: "outline_8", name: "Outline", net: 0, color: "--series-b" },
+];
+const TASKS = {
+  10: { bank: "learning_patterns.json", codes: CLOTHING, name: "clothing, 10 objects",
+        note: "Clothing, 10 objects: name the exact item from a flat picture. Chance is 10%." },
+  4: { bank: "learning_patterns.json", codes: CLOTHING, name: "clothing, 4 groups",
+       note: "Clothing, 4 groups: name whether each pattern is a top, a bottom, a shoe or a bag. Chance is 25%." },
+  "3d": { bank: "patterns3d.json", codes: CODES3D, name: "3D objects",
+          note: "3D objects: things you would meet while walking, seen by a head-height depth camera from any side and at different distances. Nearer surfaces are stronger. Chance is 10%." },
+};
+let CODES = CLOTHING;
+const banks = {};
 const GROUP = [0, 1, 0, 0, 0, 2, 0, 2, 3, 2];             // T-shirt..Ankle boot -> top/bottom/shoe/bag
 const GROUPS = ["Top", "Bottom", "Shoe", "Bag"];
 const PRACTICE = 24, TEST = 12, PER_CLASS = 50, TEST_FROM = 40;  // images 0-39 per class train, 40-49 test
 const $ = (id) => document.getElementById(id);
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-let data, mode = 10, sessions = [], db = null, userId = "local";
+let data = null, mode = 10, sessions = [], db = null, userId = "local";
 let order, blockIdx, trials, t, startTime, blocks, phase, codeLetters;
 
 function store(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || "null"); localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
@@ -156,9 +172,9 @@ function draw(canvas, pat) {
   }
 }
 function drawThumb(canvas, hex) {
-  const ctx = canvas.getContext("2d"), img = ctx.createImageData(14, 14);
-  for (let i = 0; i < 196; i++) { const v = parseInt(hex.substr(i * 2, 2), 16); img.data.set([v, v, v, 255], i * 4); }
-  const off = document.createElement("canvas"); off.width = off.height = 14; off.getContext("2d").putImageData(img, 0, 0);
+  const k = Math.round(Math.sqrt(hex.length / 2)), ctx = canvas.getContext("2d"), img = ctx.createImageData(k, k);
+  for (let i = 0; i < k * k; i++) { const v = parseInt(hex.substr(i * 2, 2), 16); img.data.set([v, v, v, 255], i * 4); }
+  const off = document.createElement("canvas"); off.width = off.height = k; off.getContext("2d").putImageData(img, 0, 0);
   ctx.imageSmoothingEnabled = false; ctx.drawImage(off, 0, 0, canvas.width, canvas.height);
 }
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -186,12 +202,10 @@ function drawTrials(test, n) {
 function modeSessions() { return sessions.filter((s) => s.mode === mode).sort((a, b) => a.ts - b.ts); }
 function renderCurve() {
   const list = modeSessions(), body = $("curveBody"), chance = mode === 4 ? 25 : 10;
-  $("modeNote").textContent = mode === 4
-    ? "4-group task: name whether each pattern is a top, a bottom, a shoe or a bag. Chance is 25%."
-    : "10-object task: name the exact object. Chance is 10%.";
-  $("introTitle").textContent = `Session ${list.length + 1} · ${mode === 4 ? "4 groups" : "10 objects"}`;
+  $("modeNote").textContent = TASKS[mode].note;
+  $("introTitle").textContent = `Session ${list.length + 1} · ${TASKS[mode].name}`;
   if (!list.length) {
-    body.innerHTML = `<div class="empty">No ${mode === 4 ? "4-group" : "10-object"} sessions yet. Your test score for each code will appear here after your first session, one point per session.${mode === 10 ? " For reference, your first reading test on 12 October scored 55% on the shape-keeping code and 45% on the downsampled one." : ""}</div>`;
+    body.innerHTML = `<div class="empty">No ${TASKS[mode].name} sessions yet. Your test score for each code will appear here after your first session, one point per session.${mode === 10 ? " For reference, your first reading test on 12 October scored 55% on the shape-keeping code and 45% on the downsampled one." : ""}</div>`;
     return;
   }
   const W = 640, H = 260, L = 40, R = 16, T = 14, B = 34, n = Math.max(list.length, 5);
@@ -202,19 +216,21 @@ function renderCurve() {
   for (let i = 0; i < n; i++) svg += `<text x="${x(i)}" y="${H - 12}" text-anchor="middle">${i + 1}</text>`;
   CODES.forEach((c) => {
     const col = css(c.color);
-    if (mode === 10) svg += `<line x1="${L}" x2="${W - R}" y1="${y(100 * c.net)}" y2="${y(100 * c.net)}" stroke="${col}" stroke-opacity=".45" stroke-dasharray="1 4" stroke-width="2"/>`;
+    if (mode !== 4) svg += `<line x1="${L}" x2="${W - R}" y1="${y(100 * c.net)}" y2="${y(100 * c.net)}" stroke="${col}" stroke-opacity=".45" stroke-dasharray="1 4" stroke-width="2"/>`;
     const pts = list.map((s, i) => { const b = s.blocks.find((b) => b.code === c.key); return b ? [x(i), y(pct(b.testK, b.testN))] : null; }).filter(Boolean);
     if (pts.length > 1) svg += `<polyline fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round" points="${pts.map((p) => p.join(",")).join(" ")}"/>`;
     pts.forEach((p, i) => { svg += `<circle cx="${p[0]}" cy="${p[1]}" r="${i === pts.length - 1 ? 5 : 3.5}" fill="${col}"/>`; });
   });
   svg += `</svg>`;
-  const legend = CODES.map((c) => `<span style="--c:var(${c.color})">${c.name}</span>`).join("") + (mode === 10 ? `<span class="muted" style="--c:transparent">Dotted lines: reader network</span>` : "");
+  const legend = CODES.map((c) => `<span style="--c:var(${c.color})">${c.name}</span>`).join("") + (mode !== 4 ? `<span class="muted" style="--c:transparent">Dotted lines: reader network</span>` : "");
   const rows = list.map((s, i) => `<tr><td>${i + 1}</td><td>${new Date(s.ts).toLocaleDateString(undefined, { day: "numeric", month: "short" })}</td>${CODES.map((c) => { const b = s.blocks.find((b) => b.code === c.key); return `<td>${b ? `${pct(b.testK, b.testN)}% (${b.testK}/${b.testN})` : "–"}</td>`; }).join("")}</tr>`).join("");
   body.innerHTML = `<div class="chartwrap">${svg}</div><div class="legend">${legend}</div>
     <div class="tablewrap"><table><thead><tr><th>Session</th><th>Date</th>${CODES.map((c) => `<th>${c.name}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function setMode(m) {
-  mode = m; $("mode10").setAttribute("aria-pressed", m === 10); $("mode4").setAttribute("aria-pressed", m === 4);
+  mode = m; CODES = TASKS[m].codes; data = banks[TASKS[m].bank] || null;
+  [["mode10", 10], ["mode4", 4], ["mode3d", "3d"]].forEach(([id, v]) => $(id).setAttribute("aria-pressed", m === v));
+  $("start").disabled = !data;
   store("neurac-mode", m); renderCurve();
 }
 
@@ -238,7 +254,8 @@ function showStudy() {
     const fig = document.createElement("figure"), cv = document.createElement("canvas");
     cv.width = cv.height = 140; draw(cv, pats[i]);
     const cap = document.createElement("figcaption"); cap.textContent = mode === 4 ? `${GROUPS[GROUP[c]]} · ${name}` : name;
-    fig.append(cv, cap); g.append(fig);
+    const th = document.createElement("canvas"); th.className = "ref"; th.width = th.height = 64; drawThumb(th, data.thumbs[i]);
+    fig.append(cv, th, cap); g.append(fig);
   });
   blocks[blockIdx] = { code: code.key, letter: codeLetters[blockIdx], practice: [], test: [] };
   phase = "practice"; t = 0; trials = drawTrials(false, PRACTICE);
@@ -312,7 +329,7 @@ async function finish() {
   sessions.push(s); store("neurac-sessions", sessions);
   const num = modeSessions().length;
   const body = $("resultBody"); body.innerHTML = "";
-  const lines = [`Neura-C learning session ${num}, ${mode === 4 ? "4 groups" : "10 objects"}, ${new Date(s.ts).toISOString().slice(0, 10)}`];
+  const lines = [`Neura-C learning session ${num}, ${TASKS[mode].name}, ${new Date(s.ts).toISOString().slice(0, 10)}`];
   s.blocks.forEach((b) => {
     const name = CODES.find((c) => c.key === b.code).name, tr = document.createElement("tr");
     [name, `${b.practiceK} / ${b.practiceN} (${pct(b.practiceK, b.practiceN)}%)`, `${b.testK} / ${b.testN} (${pct(b.testK, b.testN)}%)`, `${(b.testMedianMs / 1000).toFixed(1)} s`]
@@ -343,17 +360,18 @@ async function connect() {
 
 async function load() {
   sessions = store("neurac-sessions") || [];
-  const m = store("neurac-mode"); if (m === 4 || m === 10) mode = m;
+  const m = store("neurac-mode"); if (m in TASKS) mode = m;
   setMode(mode);
-  try {
-    data = await (await fetch("learning_patterns.json")).json();
-    $("start").disabled = false; $("loadmsg").textContent = "";
-  } catch (e) { $("loadmsg").textContent = "The patterns could not load. Reload the page; if it keeps happening, say so in the thread."; }
+  const files = [...new Set(Object.values(TASKS).map((t) => t.bank))];
+  const got = await Promise.all(files.map((f) => fetch(f).then((r) => r.json()).then((j) => (banks[f] = j)).catch(() => null)));
+  $("loadmsg").textContent = got.every(Boolean) ? "" : "Some patterns could not load. Reload the page; if it keeps happening, say so in the thread.";
+  setMode(mode);
   connect();
 }
 
 $("mode10").onclick = () => setMode(10);
 $("mode4").onclick = () => setMode(4);
+$("mode3d").onclick = () => setMode("3d");
 $("start").onclick = () => data && startSession();
 $("beginPractice").onclick = showTrial;
 $("again").onclick = () => { $("progress").style.width = "0"; renderCurve(); show("intro"); };
