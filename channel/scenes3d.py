@@ -162,6 +162,12 @@ def render(cls, b):
     side = U(b, -0.12, 0.12) * dist
     target = torch.cat([side, look_y, torch.zeros(b, 1)], 1)
     fwd = F.normalize(target - cam, dim=1)
+    return view(sdf, yaw, cam, fwd)
+
+
+def view(sdf, yaw, cam, fwd):
+    """Ray-march one depth view of objects `sdf` (rotated by `yaw`) from camera positions `cam` looking along `fwd`."""
+    b = cam.shape[0]
     right = F.normalize(torch.cross(fwd, torch.tensor([[0.0, 1.0, 0.0]]).expand(b, 3), dim=1), dim=1)
     up = torch.cross(right, fwd, dim=1)
     t = torch.linspace(-1, 1, RES) * math.tan(FOV / 2)
