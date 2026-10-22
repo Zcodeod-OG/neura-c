@@ -1,0 +1,30 @@
+{
+ "classes": [
+  "Person",
+  "Dog",
+  "Chair",
+  "Table",
+  "Car",
+  "Stairs",
+  "Doorway",
+  "Signpost",
+  "Bin",
+  "Sofa"
+ ],
+ "directions": [
+  "Far left",
+  "Left",
+  "Ahead",
+  "Right",
+  "Far right"
+ ],
+ "near_m": 3.0,
+ "n_train": 12000,
+ "n_test": 2000,
+ "what": 0.9240000247955322,
+ "where": 0.921500027179718,
+ "near": 0.9800000190734863,
+ "all_three": 0.8355000019073486,
+ "where_within_one_sector": 0.9994999766349792,
+ "bits_per_message": 6.643856189774724
+}
