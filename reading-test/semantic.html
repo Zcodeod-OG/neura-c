@@ -1,0 +1,270 @@
+<title>First-Try Scene Test</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;600&display=swap">
+<style>
+/* Layout: same instrument panel as the reading tests; one stage per trial, three answer rows (what, where, how near) beneath */
+:root {
+  --bg: #eef0ec; --panel: #f9faf7; --ink: #1d2320; --muted: #5d6862; --line: #d3d8d2;
+  --accent: #2f6f5e; --accent-ink: #ffffff; --skin: #2a2f2c; --dot-off: #4a524d; --good: #2f7d4a; --bad: #b0412e;
+  --display: "Fraunces", Georgia, serif; --body: "Public Sans", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #141816; --panel: #1c211e; --ink: #e6ebe7; --muted: #9aa59f; --line: #2f3632;
+  --accent: #6fbfa5; --accent-ink: #0f1412; --skin: #0d100e; --dot-off: #39403b; --good: #6cc48a; --bad: #e58a74; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #141816; --panel: #1c211e; --ink: #e6ebe7; --muted: #9aa59f; --line: #2f3632;
+  --accent: #6fbfa5; --accent-ink: #0f1412; --skin: #0d100e; --dot-off: #39403b; --good: #6cc48a; --bad: #e58a74; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 760px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 48px; display: grid; gap: 20px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(1.7rem, 4vw, 2.3rem); line-height: 1.15; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--display); font-weight: 500; font-size: 1.3rem; margin: 0; text-wrap: balance; }
+p { margin: 0; max-width: 65ch; }
+.muted { color: var(--muted); }
+.eyebrow { font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px; display: grid; gap: 16px; min-width: 0; }
+.bar { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .25s; }
+.stage { display: grid; place-items: center; gap: 10px; min-height: 120px; }
+canvas.big { width: min(240px, 64vw); aspect-ratio: 1; max-width: 100%; border-radius: 8px; background: var(--skin); }
+.speaker { font-family: var(--mono); font-size: 0.85rem; color: var(--muted); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.label { font-family: var(--mono); font-size: 0.72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.answers { display: grid; gap: 14px; }
+.answers > div { display: grid; gap: 6px; }
+.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 6px; }
+button { font: inherit; cursor: pointer; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 9px 11px; }
+button:hover { border-color: var(--accent); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:disabled { cursor: default; opacity: .5; }
+button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; justify-self: start; padding-inline: 20px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 18px; font-family: var(--mono); font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-family: var(--mono); font-size: 0.72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 400; }
+textarea { width: 100%; min-height: 110px; font-family: var(--mono); font-size: 0.8rem; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 7px; padding: 10px; box-sizing: border-box; }
+ul.how { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; max-width: 65ch; }
+@media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:8px">
+    <div class="eyebrow">Neura-C · first try, no practice · headphones on</div>
+    <h1>What is there, where, and how near?</h1>
+    <p class="muted">Each trial is one scene a head-height depth camera saw: one object somewhere in front of you. You get it in one of two codes, then say what it is, which direction, and whether it is nearer than 3 metres. There is no practice and no feedback until the end, because the question is whether the code makes sense the first time.</p>
+  </header>
+
+  <div class="bar" aria-hidden="true"><i id="progress"></i></div>
+
+  <section class="panel" id="intro">
+    <h2>The two codes</h2>
+    <ul class="how">
+      <li><b>Sound code.</b> A short beep comes from the object's direction (far left to far right in your headphones). One slow beep means far; three quick beeps mean near, like a parking sensor. Then a voice says what the object is.</li>
+      <li><b>Dot code.</b> An 8 × 8 grid of dots shows the object's outline, blurred to what skin can resolve. Where it sits in the grid is its direction; bigger and brighter means nearer.</li>
+    </ul>
+    <p class="muted">20 scenes per code, about 6 minutes in all. The order of the codes is random. Check your headphones first.</p>
+    <div class="row"><button id="checkL">Play left</button><button id="checkR">Play right</button><button id="checkV">Play voice</button><span class="muted" id="checkMsg"></span></div>
+    <button class="primary" id="start" disabled>Start</button>
+    <p class="muted" id="loadmsg">Loading scenes…</p>
+  </section>
+
+  <section class="panel" id="blockIntro" hidden>
+    <div class="eyebrow" id="blockLabel"></div>
+    <h2 id="blockTitle"></h2>
+    <p id="blockText"></p>
+    <button class="primary" id="blockGo">Start these 20</button>
+  </section>
+
+  <section class="panel" id="trialPanel" hidden>
+    <div class="meta"><span id="trialCode"></span><span id="trialCount"></span></div>
+    <div class="stage" id="stage">
+      <canvas class="big" id="grid" width="320" height="320" aria-label="Electrode pattern" hidden></canvas>
+      <div class="speaker" id="speaker" hidden>Listening…</div>
+      <button id="replay" hidden>Play again</button>
+    </div>
+    <div class="answers">
+      <div><span class="label">What</span><div class="choices" id="what"></div></div>
+      <div><span class="label">Where</span><div class="choices" id="where"></div></div>
+      <div><span class="label">How near</span><div class="choices" id="near"></div></div>
+    </div>
+    <button class="primary" id="submit" disabled>Next</button>
+  </section>
+
+  <section class="panel" id="resultPanel" hidden>
+    <h2>Your first-try scores</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Code</th><th>What (chance 10%)</th><th>Where (20%)</th><th>Near/far (50%)</th><th>All three</th><th>Median time</th></tr></thead>
+      <tbody id="resultBody"></tbody>
+    </table></div>
+    <p class="muted" id="netNote"></p>
+    <p class="muted" id="saveMsg"></p>
+    <textarea id="summary" readonly aria-label="Summary"></textarea>
+    <div class="row"><button id="copy">Copy summary</button><span class="muted" id="copyMsg"></span></div>
+  </section>
+</div>
+
+<script>
+const N_PER = 20;
+const NEAR = ["Near (under 3 m)", "Far"];
+const PAN = [-1, -0.5, 0, 0.5, 1];
+const $ = (id) => document.getElementById(id);
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+let data, ac, voice = null, order, blockIdx, trials, t, startTime, blocks = [], pick = {}, db = null, userId = "local", spoke = true;
+
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function median(a) { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; }
+const pct = (k, n) => n ? Math.round(100 * k / n) : 0;
+
+function drawGrid(canvas, pat) {
+  const ctx = canvas.getContext("2d"), n = pat.length, w = canvas.width, c = w / n;
+  ctx.fillStyle = css("--skin"); ctx.fillRect(0, 0, w, w);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const v = pat[y][x] / 3, cx = (x + .5) * c, cy = (y + .5) * c;
+    ctx.beginPath();
+    if (v > 0) { const l = Math.round(90 + 165 * v); ctx.fillStyle = `rgb(${l},${l},${l})`; ctx.arc(cx, cy, c * .42, 0, 7); }
+    else { ctx.fillStyle = css("--dot-off"); ctx.arc(cx, cy, c * .1, 0, 7); }
+    ctx.fill();
+  }
+}
+
+// ---------- sound code ----------
+function audio() { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === "suspended") ac.resume(); return ac; }
+function beep(pan, at, len = 0.09) {
+  const a = audio(), o = a.createOscillator(), g = a.createGain(), p = a.createStereoPanner ? a.createStereoPanner() : null;
+  o.frequency.value = 880; o.type = "sine";
+  g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(0.35, at + 0.01); g.gain.linearRampToValueAtTime(0, at + len);
+  o.connect(g); if (p) { p.pan.value = pan; g.connect(p); p.connect(a.destination); } else g.connect(a.destination);
+  o.start(at); o.stop(at + len + 0.02);
+}
+function say(word) {
+  return new Promise((res) => {
+    if (!("speechSynthesis" in window)) { spoke = false; $("speaker").textContent = word; return res(); }
+    const u = new SpeechSynthesisUtterance(word); if (voice) u.voice = voice; u.rate = 1.0;
+    u.onend = res; u.onerror = () => { spoke = false; $("speaker").textContent = word; res(); };
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+    setTimeout(res, 2500);
+  });
+}
+async function playSound(where, near, what) {
+  const a = audio(), t0 = a.currentTime + 0.05;
+  if (near) [0, 0.14, 0.28].forEach((d) => beep(PAN[where], t0 + d)); else beep(PAN[where], t0, 0.22);
+  await new Promise((r) => setTimeout(r, 650));
+  await say(data.classes[what]);
+}
+function pickVoice() { try { const vs = speechSynthesis.getVoices(); voice = vs.find((v) => /^en/i.test(v.lang)) || vs[0] || null; } catch (e) {} }
+
+// ---------- flow ----------
+function show(id) { ["intro", "blockIntro", "trialPanel", "resultPanel"].forEach((p) => ($(p).hidden = p !== id)); }
+function setProgress() { $("progress").style.width = (100 * (blockIdx * N_PER + t) / (2 * N_PER)) + "%"; }
+const CODES = [
+  { key: "sound", name: "Sound code", text: "A beep from the object's direction (one slow beep = far, three quick beeps = near), then a voice says what it is. Use Play again if you missed it." },
+  { key: "dots", name: "Dot code", text: "An 8 × 8 outline of the object, blurred to skin resolution. Its position in the grid is its direction; bigger and brighter means nearer." },
+];
+function start() {
+  audio(); order = shuffle([0, 1]); blockIdx = 0;
+  const all = shuffle(data.truth.map((_, i) => i));
+  pick = { sound: all.slice(0, N_PER), dots: all.slice(N_PER, 2 * N_PER) };
+  showBlock();
+}
+function showBlock() {
+  const code = CODES[order[blockIdx]];
+  $("blockLabel").textContent = `Part ${blockIdx + 1} of 2`;
+  $("blockTitle").textContent = code.name; $("blockText").textContent = code.text;
+  blocks[blockIdx] = { code: code.key, answers: [] }; t = 0; trials = pick[code.key];
+  show("blockIntro"); setProgress();
+}
+function buttons(el, names, key) {
+  el.innerHTML = "";
+  names.forEach((name, i) => {
+    const b = document.createElement("button"); b.textContent = name; b.id = `${key}-${i}`; b.setAttribute("aria-pressed", "false");
+    b.onclick = () => { [...el.children].forEach((x) => x.setAttribute("aria-pressed", "false")); b.setAttribute("aria-pressed", "true"); current[key] = i; $("submit").disabled = !(current.what >= 0 && current.where >= 0 && current.near >= 0); };
+    el.append(b);
+  });
+}
+let current = {};
+function showTrial() {
+  show("trialPanel");
+  const code = CODES[order[blockIdx]], i = trials[t];
+  $("trialCode").textContent = code.name; $("trialCount").textContent = `${t + 1} of ${N_PER}`;
+  current = { what: -1, where: -1, near: -1 };
+  buttons($("what"), data.classes, "what"); buttons($("where"), data.directions, "where"); buttons($("near"), NEAR, "near");
+  $("submit").disabled = true;
+  const sound = code.key === "sound";
+  $("grid").hidden = sound; $("speaker").hidden = !sound; $("replay").hidden = !sound;
+  if (sound) {
+    $("speaker").textContent = "Listening…";
+    const [w, wh, nr] = data.said[i];       // the slot network's answers, mistakes included
+    $("replay").onclick = () => playSound(wh, nr === 1, w);
+    playSound(wh, nr === 1, w);
+  } else drawGrid($("grid"), data.grids[i]);
+  startTime = performance.now(); setProgress();
+}
+function submit() {
+  const i = trials[t], [tw, twh, tn] = data.truth[i];
+  // answers are scored against what is really in the scene; near button 0 = near (label 1)
+  const said = { what: current.what, where: current.where, near: current.near === 0 ? 1 : 0 };
+  blocks[blockIdx].answers.push({ i, truth: [tw, twh, tn], said: [said.what, said.where, said.near],
+    ok: [said.what === tw, said.where === twh, said.near === tn], ms: Math.round(performance.now() - startTime) });
+  t++;
+  if (t < N_PER) return showTrial();
+  blockIdx++;
+  if (blockIdx < 2) return showBlock();
+  finish();
+}
+
+function score(b) {
+  const a = b.answers, n = a.length, k = (j) => a.filter((x) => x.ok[j]).length;
+  return { n, what: k(0), where: k(1), near: k(2), all: a.filter((x) => x.ok.every(Boolean)).length, med: median(a.map((x) => x.ms)) };
+}
+async function finish() {
+  $("progress").style.width = "100%"; show("resultPanel");
+  const body = $("resultBody"); body.innerHTML = "";
+  const lines = [`Neura-C first-try scene test, ${new Date().toISOString().slice(0, 10)}${spoke ? "" : " (voice unavailable, word shown as text)"}`];
+  const out = { ts: Date.now(), user: userId, spoke, blocks: [] };
+  blocks.forEach((b) => {
+    const s = score(b), name = CODES.find((c) => c.key === b.code).name, tr = document.createElement("tr");
+    [name, `${pct(s.what, s.n)}% (${s.what}/${s.n})`, `${pct(s.where, s.n)}%`, `${pct(s.near, s.n)}%`, `${pct(s.all, s.n)}%`, `${(s.med / 1000).toFixed(1)} s`]
+      .forEach((v) => { const td = document.createElement("td"); td.textContent = v; tr.append(td); });
+    body.append(tr);
+    lines.push(`${b.code}: what ${s.what}/${s.n}, where ${s.where}/${s.n}, near ${s.near}/${s.n}, all three ${s.all}/${s.n}, median ${(s.med / 1000).toFixed(1)} s`);
+    lines.push("  answers (truth>said as what.where.near): " + b.answers.map((x) => `${x.truth.join(".")}>${x.said.join(".")}`).join(" "));
+    out.blocks.push({ code: b.code, ...s, answers: b.answers.map((x) => `${x.truth.join(".")}>${x.said.join(".")}`).join(" ") });
+  });
+  $("netNote").textContent = `The sound code carries the slot network's own answers, so its mistakes count against you too. On these ${data.truth.length} scenes the network had all three slots right ${pct(data.said.filter((s, i) => s.every((v, j) => v === data.truth[i][j])).length, data.truth.length)}% of the time.`;
+  $("summary").value = lines.join("\n");
+  $("saveMsg").textContent = "Saving…";
+  if (!db) { $("saveMsg").textContent = "Saved in this page only. Copy the summary into the thread."; return; }
+  try { await db.collection("firsttry").doc(String(out.ts)).set(out); $("saveMsg").textContent = "Saved. Claude can read it, so there's nothing to paste."; }
+  catch (e) { $("saveMsg").textContent = "Could not save online. Copy the summary into the thread."; }
+}
+
+async function connect() {
+  try {
+    const user = await window.claude?.use?.("user");
+    if (user) userId = (await user.id()) || "local";
+    db = await window.claude?.use?.("db");
+  } catch (e) { db = null; }
+}
+async function load() {
+  try {
+    data = await (await fetch("patterns_semantic.json")).json();
+    $("start").disabled = false; $("loadmsg").textContent = "";
+  } catch (e) { $("loadmsg").textContent = "The scenes could not load. Reload the page; if it keeps happening, say so in the thread."; }
+  if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+  connect();
+}
+
+$("checkL").onclick = () => { beep(-1, audio().currentTime + 0.05, 0.25); $("checkMsg").textContent = "That should be in your left ear."; };
+$("checkR").onclick = () => { beep(1, audio().currentTime + 0.05, 0.25); $("checkMsg").textContent = "That should be in your right ear."; };
+$("checkV").onclick = async () => { $("checkMsg").textContent = ""; await say("chair"); $("checkMsg").textContent = spoke ? "You should have heard the word chair." : "Your browser has no voice, so words will be shown as text."; };
+$("start").onclick = () => data && start();
+$("blockGo").onclick = showTrial;
+$("submit").onclick = submit;
+$("copy").onclick = () => {
+  navigator.clipboard.writeText($("summary").value).then(() => ($("copyMsg").textContent = "Copied"),
+    () => { $("summary").select(); $("copyMsg").textContent = "Text selected; copy it with your keyboard"; });
+};
+load();
+</script>
