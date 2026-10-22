@@ -51,7 +51,7 @@ ul.how { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; max-width: 65c
 
 <div class="wrap">
   <header style="display:grid;gap:8px">
-    <div class="eyebrow">Neura-C · first try, no practice · headphones on</div>
+    <div class="eyebrow">Neura-C · first try, no practice · headphones on · version 2</div>
     <h1>What is there, where, and how near?</h1>
     <p class="muted">Each trial is one scene a head-height depth camera saw: one object somewhere in front of you. You get it in one of two codes, then say what it is, which direction, and whether it is nearer than 3 metres. There is no practice and no feedback until the end, because the question is whether the code makes sense the first time.</p>
   </header>
@@ -61,11 +61,11 @@ ul.how { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; max-width: 65c
   <section class="panel" id="intro">
     <h2>The two codes</h2>
     <ul class="how">
-      <li><b>Sound code.</b> A short beep comes from the object's direction (far left to far right in your headphones). One slow beep means far; three quick beeps mean near, like a parking sensor. Then a voice says what the object is.</li>
+      <li><b>Sound code.</b> A short beep comes from the object's direction: left, ahead or right. One slow beep means far; three quick beeps mean near, like a parking sensor. Then a voice says what the object is.</li>
       <li><b>Dot code.</b> An 8 × 8 grid of dots shows the object's outline, blurred to what skin can resolve. Where it sits in the grid is its direction; bigger and brighter means nearer.</li>
     </ul>
     <p class="muted">20 scenes per code, about 6 minutes in all. The order of the codes is random. Check your headphones first.</p>
-    <div class="row"><button id="checkL">Play left</button><button id="checkR">Play right</button><button id="checkV">Play voice</button><span class="muted" id="checkMsg"></span></div>
+    <div class="row"><button id="checkL">Play left</button><button id="checkA">Play ahead</button><button id="checkR">Play right</button><button id="checkV">Play voice</button><span class="muted" id="checkMsg"></span></div>
     <button class="primary" id="start" disabled>Start</button>
     <p class="muted" id="loadmsg">Loading scenes…</p>
   </section>
@@ -95,7 +95,7 @@ ul.how { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; max-width: 65c
   <section class="panel" id="resultPanel" hidden>
     <h2>Your first-try scores</h2>
     <div class="tablewrap"><table>
-      <thead><tr><th>Code</th><th>What (chance 10%)</th><th>Where (20%)</th><th>Near/far (50%)</th><th>All three</th><th>Median time</th></tr></thead>
+      <thead><tr><th>Code</th><th>What (chance 10%)</th><th>Where (33%)</th><th>Near/far (50%)</th><th>All three</th><th>Median time</th></tr></thead>
       <tbody id="resultBody"></tbody>
     </table></div>
     <p class="muted" id="netNote"></p>
@@ -108,7 +108,10 @@ ul.how { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; max-width: 65c
 <script>
 const N_PER = 20;
 const NEAR = ["Near (under 3 m)", "Far"];
-const PAN = [-1, -0.5, 0, 0.5, 1];
+const VERSION = 2;
+// Words as they are spoken and shown on the buttons (v1's "Doorway" was heard as "Dog")
+const SPOKEN = ["Person", "Dog", "Chair", "Table", "Car", "Stairs", "Entrance", "Sign post", "Bin", "Sofa"];
+const angleOf = (where) => { const n = data.directions.length; return n === 1 ? 0 : -60 + 120 * where / (n - 1); };
 const $ = (id) => document.getElementById(id);
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 let data, ac, voice = null, order, blockIdx, trials, t, startTime, blocks = [], pick = {}, db = null, userId = "local", spoke = true;
@@ -131,11 +134,15 @@ function drawGrid(canvas, pat) {
 
 // ---------- sound code ----------
 function audio() { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === "suspended") ac.resume(); return ac; }
-function beep(pan, at, len = 0.09) {
-  const a = audio(), o = a.createOscillator(), g = a.createGain(), p = a.createStereoPanner ? a.createStereoPanner() : null;
-  o.frequency.value = 880; o.type = "sine";
-  g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(0.35, at + 0.01); g.gain.linearRampToValueAtTime(0, at + len);
-  o.connect(g); if (p) { p.pan.value = pan; g.connect(p); p.connect(a.destination); } else g.connect(a.destination);
+// A short broadband click-tone placed in 3D around the head (HRTF), so direction sounds like direction
+function beep(angle, at, len = 0.09) {
+  const a = audio(), o = a.createOscillator(), g = a.createGain(), p = a.createPanner();
+  o.frequency.value = 660; o.type = "triangle";
+  g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(0.5, at + 0.01); g.gain.linearRampToValueAtTime(0, at + len);
+  p.panningModel = "HRTF"; p.distanceModel = "linear"; p.refDistance = 1; p.maxDistance = 10; p.rolloffFactor = 0;
+  const r = angle * Math.PI / 180;
+  if (p.positionX) { p.positionX.value = Math.sin(r); p.positionY.value = 0; p.positionZ.value = -Math.cos(r); } else p.setPosition(Math.sin(r), 0, -Math.cos(r));
+  o.connect(g); g.connect(p); p.connect(a.destination);
   o.start(at); o.stop(at + len + 0.02);
 }
 function say(word) {
@@ -149,9 +156,9 @@ function say(word) {
 }
 async function playSound(where, near, what) {
   const a = audio(), t0 = a.currentTime + 0.05;
-  if (near) [0, 0.14, 0.28].forEach((d) => beep(PAN[where], t0 + d)); else beep(PAN[where], t0, 0.22);
+  if (near) [0, 0.14, 0.28].forEach((d) => beep(angleOf(where), t0 + d)); else beep(angleOf(where), t0, 0.22);
   await new Promise((r) => setTimeout(r, 650));
-  await say(data.classes[what]);
+  await say(SPOKEN[what]);
 }
 function pickVoice() { try { const vs = speechSynthesis.getVoices(); voice = vs.find((v) => /^en/i.test(v.lang)) || vs[0] || null; } catch (e) {} }
 
@@ -189,7 +196,7 @@ function showTrial() {
   const code = CODES[order[blockIdx]], i = trials[t];
   $("trialCode").textContent = code.name; $("trialCount").textContent = `${t + 1} of ${N_PER}`;
   current = { what: -1, where: -1, near: -1 };
-  buttons($("what"), data.classes, "what"); buttons($("where"), data.directions, "where"); buttons($("near"), NEAR, "near");
+  buttons($("what"), SPOKEN, "what"); buttons($("where"), data.directions, "where"); buttons($("near"), NEAR, "near");
   $("submit").disabled = true;
   const sound = code.key === "sound";
   $("grid").hidden = sound; $("speaker").hidden = !sound; $("replay").hidden = !sound;
@@ -221,8 +228,8 @@ function score(b) {
 async function finish() {
   $("progress").style.width = "100%"; show("resultPanel");
   const body = $("resultBody"); body.innerHTML = "";
-  const lines = [`Neura-C first-try scene test, ${new Date().toISOString().slice(0, 10)}${spoke ? "" : " (voice unavailable, word shown as text)"}`];
-  const out = { ts: Date.now(), user: userId, spoke, blocks: [] };
+  const lines = [`Neura-C first-try scene test v${VERSION}, ${new Date().toISOString().slice(0, 10)}${spoke ? "" : " (voice unavailable, word shown as text)"}`];
+  const out = { ts: Date.now(), version: VERSION, user: userId, spoke, blocks: [] };
   blocks.forEach((b) => {
     const s = score(b), name = CODES.find((c) => c.key === b.code).name, tr = document.createElement("tr");
     [name, `${pct(s.what, s.n)}% (${s.what}/${s.n})`, `${pct(s.where, s.n)}%`, `${pct(s.near, s.n)}%`, `${pct(s.all, s.n)}%`, `${(s.med / 1000).toFixed(1)} s`]
@@ -256,9 +263,10 @@ async function load() {
   connect();
 }
 
-$("checkL").onclick = () => { beep(-1, audio().currentTime + 0.05, 0.25); $("checkMsg").textContent = "That should be in your left ear."; };
-$("checkR").onclick = () => { beep(1, audio().currentTime + 0.05, 0.25); $("checkMsg").textContent = "That should be in your right ear."; };
+$("checkL").onclick = () => { beep(-60, audio().currentTime + 0.05, 0.25); $("checkMsg").textContent = "That should be in your left ear."; };
+$("checkR").onclick = () => { beep(60, audio().currentTime + 0.05, 0.25); $("checkMsg").textContent = "That should be in your right ear."; };
 $("checkV").onclick = async () => { $("checkMsg").textContent = ""; await say("chair"); $("checkMsg").textContent = spoke ? "You should have heard the word chair." : "Your browser has no voice, so words will be shown as text."; };
+$("checkA").onclick = () => { beep(0, audio().currentTime + 0.05, 0.25); $("checkMsg").textContent = "That should sound straight ahead, in the middle."; };
 $("start").onclick = () => data && start();
 $("blockGo").onclick = showTrial;
 $("submit").onclick = submit;

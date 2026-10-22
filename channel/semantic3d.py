@@ -4,9 +4,9 @@ Scenes: one of the 10 objects from scenes3d.py placed at a random direction (wit
 view) and distance in front of a head-height depth camera. A small CNN ("slot network") reads the full
 64 x 64 depth image and outputs three slots:
   what   - which of the 10 objects
-  where  - one of 5 directions: far left, left, ahead, right, far right (12 degree sectors)
+  where  - one of 3 directions: left, ahead, right (20 degree sectors; 5 sectors were too fine to hear)
   near   - nearer or further than 3 m
-That is log2(10 * 5 * 2) = 6.6 bits per message, small enough for speech, spatial audio or a few tactors.
+That is log2(10 * 3 * 2) = 5.9 bits per message, small enough for speech, spatial audio or a few tactors.
 
 For the human test the script also exports, per test scene, the slot network's own answers (so the test
 is end to end, mistakes included) and the 8 x 8 outline grid blurred to skin resolution for comparison.
@@ -23,10 +23,11 @@ import torch.nn.functional as F
 import scenes3d as s3
 import train_channel as tc
 
-DIRECTIONS = ["Far left", "Left", "Ahead", "Right", "Far right"]
+DIRECTIONS = ["Left", "Ahead", "Right"]
 NEAR_M = 3.0
-SECTOR = 12.0                       # degrees per direction sector, 5 sectors = 60 degree view
-PER_CLASS_TRAIN, PER_CLASS_TEST, EPOCHS = 1200, 200, 12
+SECTOR = 20.0                       # degrees per direction sector, 3 sectors = 60 degree view
+ND = len(DIRECTIONS)
+PER_CLASS_TRAIN, PER_CLASS_TEST, EPOCHS = 1600, 200, 20
 EXPORT_PER_CLASS = 12
 SKIN_BLUR = 0.7                     # Gaussian blur, in electrodes, standing in for skin spatial acuity
 
@@ -36,12 +37,12 @@ def scene(cls, b):
     yaw = s3.U(b, 0, 2 * math.pi)[:, 0]
     lo, hi = (3.0, 9.0) if cls == 4 else (1.5, 6.0)                 # cars are met further away
     dist = lo + (hi - lo) * torch.rand(b)
-    az = (torch.rand(b) - 0.5) * 2 * (2.5 * SECTOR)                  # degrees, uniform over the 5 sectors
+    az = (torch.rand(b) - 0.5) * ND * SECTOR                         # degrees, uniform over the sectors
     x, z = dist * torch.sin(torch.deg2rad(az)), dist * torch.cos(torch.deg2rad(az))
     fwd = F.normalize(torch.tensor([[0.0, 0.7 - s3.CAM_H, -6.0]]), dim=1).expand(b, 3)
     cam = torch.stack([-x, torch.full((b,), s3.CAM_H), z], 1)        # object at origin, camera moved instead
     img, th, cover = s3.view(sdf, yaw[:, None], cam, fwd)
-    where = ((az + 2.5 * SECTOR) // SECTOR).clamp(0, 4).long()
+    where = ((az + ND * SECTOR / 2) // SECTOR).clamp(0, ND - 1).long()
     near = (dist < NEAR_M).long()
     return img, th, cover, where, near
 
@@ -67,11 +68,11 @@ class SlotNet(nn.Module):
             nn.Conv2d(2, 32, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
             nn.Conv2d(32, 64, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
             nn.Conv2d(64, 64, 3, padding=1), nn.ReLU(), nn.AdaptiveAvgPool2d(4))
-        self.fc = nn.Sequential(nn.Flatten(), nn.Linear(64 * 16, 256), nn.ReLU(), nn.Linear(256, 10 + 5 + 2))
+        self.fc = nn.Sequential(nn.Flatten(), nn.Linear(64 * 16, 256), nn.ReLU(), nn.Linear(256, 10 + ND + 2))
 
     def forward(self, x):
         o = self.fc(self.conv(x))
-        return o[:, :10], o[:, 10:15], o[:, 15:]
+        return o[:, :10], o[:, 10:10 + ND], o[:, 10 + ND:]
 
 
 def skin_grid(x, n=8):
@@ -111,7 +112,7 @@ if __name__ == "__main__":
            "what": ok_a.float().mean().item(), "where": ok_w.float().mean().item(), "near": ok_n.float().mean().item(),
            "all_three": (ok_a & ok_w & ok_n).float().mean().item(),
            "where_within_one_sector": ((pw - Wte).abs() <= 1).float().mean().item(),
-           "bits_per_message": math.log2(10 * 5 * 2)}
+           "bits_per_message": math.log2(10 * ND * 2)}
     print({k: (round(v, 4) if isinstance(v, float) else v) for k, v in res.items() if not isinstance(v, list)}, flush=True)
     json.dump(res, open(out, "w"), indent=1)
     if pat_out:
