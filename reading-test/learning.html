@@ -79,7 +79,7 @@ textarea { width: 100%; min-height: 110px; font-family: var(--mono); font-size: 
     <div class="row" style="justify-content:space-between">
       <h2>Your learning curve</h2>
       <div class="seg" role="group" aria-label="Task">
-        <button id="mode10" aria-pressed="true">Clothing, 10</button><button id="mode4" aria-pressed="false">Clothing, 4 groups</button><button id="mode3d" aria-pressed="false">3D objects</button>
+        <button id="mode10" aria-pressed="true">Clothing, 10</button><button id="mode4" aria-pressed="false">Clothing, 4 groups</button><button id="mode3d" aria-pressed="false">3D objects</button><button id="modeMotion" aria-pressed="false">Motion</button>
       </div>
     </div>
     <div id="curveBody"></div>
@@ -140,6 +140,10 @@ const CODES3D = [
   { key: "learned_8_a4", name: "Shape-keeping", net: 0.956, color: "--series-a" },
   { key: "outline_8", name: "Outline", net: 0.95, color: "--series-b" },
 ];
+const CODESMOTION = [
+  { key: "outline_seq_8", name: "Outline", net: 0.994, color: "--series-a" },
+  { key: "trail_seq_8", name: "Outline + trail", net: 0.971, color: "--series-b" },
+];
 const TASKS = {
   10: { bank: "learning_patterns.json", codes: CLOTHING, name: "clothing, 10 objects",
         note: "Clothing, 10 objects: name the exact item from a flat picture. Chance is 10%." },
@@ -147,12 +151,17 @@ const TASKS = {
        note: "Clothing, 4 groups: name whether each pattern is a top, a bottom, a shoe or a bag. Chance is 25%." },
   "3d": { bank: "patterns3d.json", codes: CODES3D, name: "3D objects",
           note: "3D objects: things you would meet while walking, seen by a head-height depth camera from any side and at different distances. Nearer surfaces are stronger. Chance is 10%." },
+  motion: { bank: "patterns_motion.json", codes: CODESMOTION, name: "motion", per: 20, testFrom: 15, chance: 20,
+            note: "Motion: each pattern is a 1-second clip of a person, dog or car, playing on a loop. Say how it moves: towards you, away, crossing left, crossing right, or standing still. Chance is 20%." },
 };
 let CODES = CLOTHING;
 const banks = {};
 const GROUP = [0, 1, 0, 0, 0, 2, 0, 2, 3, 2];             // T-shirt..Ankle boot -> top/bottom/shoe/bag
 const GROUPS = ["Top", "Bottom", "Shoe", "Bag"];
-const PRACTICE = 24, TEST = 12, PER_CLASS = 50, TEST_FROM = 40;  // images 0-39 per class train, 40-49 test
+const PRACTICE = 24, TEST = 12;
+// Pattern banks are grouped in runs of `per` items; within a group the first `testFrom` are for study and practice, the rest for testing
+const perGroup = () => TASKS[mode].per || 50, testFrom = () => TASKS[mode].testFrom || 40;
+const anims = new Map();
 const $ = (id) => document.getElementById(id);
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 let data = null, mode = 10, sessions = [], db = null, userId = "local";
@@ -160,7 +169,16 @@ let order, blockIdx, trials, t, startTime, blocks, phase, codeLetters;
 
 function store(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || "null"); localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
 
+// A pattern is one frame (rows of electrode levels) or a clip (a list of frames), which plays on a loop
 function draw(canvas, pat) {
+  clearInterval(anims.get(canvas));
+  if (!Array.isArray(pat[0][0])) return drawFrame(canvas, pat);
+  let f = 0;
+  const still = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  drawFrame(canvas, pat[0]);
+  anims.set(canvas, setInterval(() => { f = (f + 1) % (pat.length + 2); drawFrame(canvas, pat[Math.min(f, pat.length - 1)]); }, still ? 400 : 200));
+}
+function drawFrame(canvas, pat) {
   const ctx = canvas.getContext("2d"), n = pat.length, w = canvas.width, c = w / n;
   ctx.fillStyle = css("--skin"); ctx.fillRect(0, 0, w, w);
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
@@ -183,10 +201,10 @@ const pct = (k, n) => n ? Math.round(100 * k / n) : 0;
 const answerOf = (cls) => mode === 4 ? GROUP[cls] : cls;
 const choiceNames = () => mode === 4 ? GROUPS : data.classes;
 
-// Indices into the bank: per class, the first TEST_FROM images are for study and practice, the rest for testing.
+// Indices into the bank for practice (after the reference item) or for testing
 function poolFor(test) {
   const out = [];
-  data.labels.forEach((l, i) => { const k = i % PER_CLASS; if (test ? k >= TEST_FROM : k > 0 && k < TEST_FROM) out.push(i); });
+  data.labels.forEach((l, i) => { const k = i % perGroup(); if (test ? k >= testFrom() : k > 0 && k < testFrom()) out.push(i); });
   return out;
 }
 // Draw n trials balanced over answers (classes in 10-way, groups in 4-way)
@@ -201,7 +219,7 @@ function drawTrials(test, n) {
 // ---------- learning curve ----------
 function modeSessions() { return sessions.filter((s) => s.mode === mode).sort((a, b) => a.ts - b.ts); }
 function renderCurve() {
-  const list = modeSessions(), body = $("curveBody"), chance = mode === 4 ? 25 : 10;
+  const list = modeSessions(), body = $("curveBody"), chance = TASKS[mode].chance || (mode === 4 ? 25 : 10);
   $("modeNote").textContent = TASKS[mode].note;
   $("introTitle").textContent = `Session ${list.length + 1} · ${TASKS[mode].name}`;
   if (!list.length) {
@@ -229,7 +247,7 @@ function renderCurve() {
 }
 function setMode(m) {
   mode = m; CODES = TASKS[m].codes; data = banks[TASKS[m].bank] || null;
-  [["mode10", 10], ["mode4", 4], ["mode3d", "3d"]].forEach(([id, v]) => $(id).setAttribute("aria-pressed", m === v));
+  [["mode10", 10], ["mode4", 4], ["mode3d", "3d"], ["modeMotion", "motion"]].forEach(([id, v]) => $(id).setAttribute("aria-pressed", m === v));
   $("start").disabled = !data;
   store("neurac-mode", m); renderCurve();
 }
@@ -248,12 +266,14 @@ function startSession() {
 function showStudy() {
   const code = CODES[order[blockIdx]], pats = data.runs[code.key];
   $("studyLabel").textContent = `${codeLetters[blockIdx]} · ${blockIdx + 1} of ${CODES.length}`;
-  const g = $("studyGrid"); g.innerHTML = "";
+  const g = $("studyGrid");
+  anims.forEach((id, cv) => { if (cv !== $("trialCanvas")) { clearInterval(id); anims.delete(cv); } });
+  g.innerHTML = "";
   data.classes.forEach((name, c) => {
-    const i = c * PER_CLASS;   // first image of each class is the reference
+    const i = c * perGroup();   // first item of each group is the reference
     const fig = document.createElement("figure"), cv = document.createElement("canvas");
     cv.width = cv.height = 140; draw(cv, pats[i]);
-    const cap = document.createElement("figcaption"); cap.textContent = mode === 4 ? `${GROUPS[GROUP[c]]} · ${name}` : name;
+    const cap = document.createElement("figcaption"); cap.textContent = mode === 4 ? `${GROUPS[GROUP[c]]} · ${name}` : data.objects ? `${name} · ${data.objects[data.object_labels[i]]}` : name;
     const th = document.createElement("canvas"); th.className = "ref"; th.width = th.height = 64; drawThumb(th, data.thumbs[i]);
     fig.append(cv, th, cap); g.append(fig);
   });
@@ -284,7 +304,8 @@ function answer(c, btn) {
   if (phase === "practice") {
     btn.classList.add(ok ? "right" : "wrong");
     if (!ok) $("choice-" + tr.truth).classList.add("right");
-    $("feedback").textContent = ok ? `Correct: ${data.classes[tr.cls]}` : `It was ${data.classes[tr.cls]}`;
+    const what = data.classes[tr.cls] + (data.objects ? ` · ${data.objects[data.object_labels[tr.i]]}` : "");
+    $("feedback").textContent = ok ? `Correct: ${what}` : `It was ${what}`;
     $("feedback").className = "feedback " + (ok ? "ok" : "no");
     drawThumb($("thumb"), data.thumbs[tr.i]); $("reveal").hidden = false;
     wait = ok ? 900 : 1800;
@@ -363,7 +384,7 @@ async function load() {
   const m = store("neurac-mode"); if (m in TASKS) mode = m;
   setMode(mode);
   const files = [...new Set(Object.values(TASKS).map((t) => t.bank))];
-  const got = await Promise.all(files.map((f) => fetch(f).then((r) => r.json()).then((j) => (banks[f] = j)).catch(() => null)));
+  const got = await Promise.all(files.map((f) => fetch(f).then((r) => r.json()).then((j) => (banks[f] = j.motions ? { ...j, classes: j.motions, labels: j.motion_labels } : j)).catch(() => null)));
   $("loadmsg").textContent = got.every(Boolean) ? "" : "Some patterns could not load. Reload the page; if it keeps happening, say so in the thread.";
   setMode(mode);
   connect();
@@ -372,6 +393,7 @@ async function load() {
 $("mode10").onclick = () => setMode(10);
 $("mode4").onclick = () => setMode(4);
 $("mode3d").onclick = () => setMode("3d");
+$("modeMotion").onclick = () => setMode("motion");
 $("start").onclick = () => data && startSession();
 $("beginPractice").onclick = showTrial;
 $("again").onclick = () => { $("progress").style.width = "0"; renderCurve(); show("intro"); };
