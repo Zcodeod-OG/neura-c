@@ -98,7 +98,7 @@ class Learned(nn.Module):
     def forward(self, movie, noise=0.0):
         """`noise` > 0 adds logistic noise to the logits (training only), which keeps pixels from all
         settling on or off before the network has learned when to flash them."""
-        z = self.logits(movie)
+        z = 3 * torch.tanh(self.logits(movie) / 3)       # bounded, so a pixel can always be flipped back
         if noise > 0:
             u = torch.rand_like(z).clamp(1e-6, 1 - 1e-6)
             z = z + noise * (u.log() - (1 - u).log())

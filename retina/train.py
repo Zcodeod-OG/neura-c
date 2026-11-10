@@ -20,6 +20,7 @@ if __name__ == "__main__":
     steps = int(sys.argv[5]) if len(sys.argv) > 5 else 600
     torch.set_num_threads(int(sys.argv[6]) if len(sys.argv) > 6 else 4)
     torch.manual_seed(0)
+    torch.set_flush_denormal(True)          # decaying opsin activation otherwise reaches very slow tiny numbers
     clips = data.Clips(npz, "train", seed=0)
     val = data.Clips(npz, "train", seed=99).sample(24)
     h = healthy.HealthyLN()
