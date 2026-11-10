@@ -25,7 +25,7 @@ if __name__ == "__main__":
     h = healthy.HealthyLN()
     tr = treated.Treated(h, target, pitch=pitch)
     enc = encoders.Learned(pitch)
-    opt = torch.optim.Adam(enc.parameters(), 2e-3)
+    opt = torch.optim.Adam(enc.parameters(), 1e-3)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, steps)
     with torch.no_grad():
         val_h = h(val)
@@ -34,7 +34,8 @@ if __name__ == "__main__":
         x = clips.sample(12)
         with torch.no_grad():
             target_rates = h(x)
-        l = score.loss(tr(enc(x)), target_rates, h.kinds)
+        noise = max(0.0, 1.0 - step / (0.6 * steps))            # logistic noise on the logits, annealed to zero
+        l = score.loss(tr(enc(x, noise)), target_rates, h.kinds)
         opt.zero_grad(); l.backward(); opt.step(); sched.step()
         if step % 25 == 0 or step == steps:
             with torch.no_grad():

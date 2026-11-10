@@ -16,10 +16,14 @@ def match(treated, healthy, kinds):
     return out
 
 
-def loss(treated, healthy, kinds):
-    """Training loss: squared error normalised by the healthy variance of each cell type."""
+def loss(treated, healthy, kinds, mse_weight=0.2):
+    """Training loss per cell type: one minus the correlation with healthy firing, plus a smaller squared-error
+    term (normalised by the healthy variance) that sets the overall firing level. Squared error alone makes
+    "all pixels off" a trap, because early random flashes fire the cells more wrongly than silence does."""
     total = 0.0
     for ti in range(2):
         a, b = treated[:, WARM:, kinds == ti], healthy[:, WARM:, kinds == ti]
-        total = total + (a - b).pow(2).mean() / b.var().detach()
+        ac, bc = a - a.mean(), b - b.mean()
+        r = (ac * bc).mean() / (ac.pow(2).mean().sqrt() * bc.pow(2).mean().sqrt() + 1e-3)
+        total = total + (1 - r) + mse_weight * (a - b).pow(2).mean() / b.var().detach()
     return total / 2
