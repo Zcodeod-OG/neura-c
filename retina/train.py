@@ -2,6 +2,10 @@
 
 Target is HealthyLN only; HealthySubunit is kept for evaluate.py.
 
+With the opsin in the ganglion cells, training from scratch settles on "all pixels off": early random flashes
+fire the cells more wrongly than silence does. So that case starts with WARM_START steps of imitating the
+event code (the best hand-designed encoder there), then trains through the simulator like the other.
+
 Usage: python3 train.py <clips.npz> <rgc|bipolar> <out.pt> [pitch] [steps] [threads]
 """
 import json
@@ -13,6 +17,9 @@ import encoders
 import healthy
 import score
 import treated
+
+WARM_START = {"rgc": 80, "bipolar": 0}
+EVENT = {"delay": 2, "level": 0.1, "hold": 1}
 
 if __name__ == "__main__":
     npz, target, out = sys.argv[1:4]
@@ -35,8 +42,12 @@ if __name__ == "__main__":
         x = clips.sample(12)
         with torch.no_grad():
             target_rates = h(x)
-        noise = max(0.0, 1.0 - step / (0.6 * steps))            # logistic noise on the logits, annealed to zero
-        l = score.loss(tr(enc(x, noise)), target_rates, h.kinds)
+        if step <= WARM_START[target]:
+            l = torch.nn.functional.binary_cross_entropy_with_logits(enc.logits(x), encoders.event(x, pitch, **EVENT))
+        else:
+            done = (step - WARM_START[target]) / (steps - WARM_START[target])
+            noise = max(0.0, 1.0 - done / 0.6)                  # logistic noise on the logits, annealed to zero
+            l = score.loss(tr(enc(x, noise)), target_rates, h.kinds)
         opt.zero_grad(); l.backward(); opt.step(); sched.step()
         if step % 25 == 0 or step == steps:
             with torch.no_grad():
