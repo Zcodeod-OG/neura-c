@@ -8,7 +8,8 @@ For each treatment target (opsin in ganglion cells, opsin in ON bipolar cells):
 Scores:
   r, fve     - firing match to the healthy model (score.py), per cell type
   identify   - share of test clips whose treated response is closest to its own healthy response
-  decode_r   - a linear decoder fitted on healthy firing reads the treated firing; correlation with the movie
+  decode     - linear decoders fitted on healthy firing (all cells, ON only, OFF only) read the treated firing;
+               correlation with what changed in the movie (score.py)
 Everything is reported against HealthyLN (training target) and HealthySubunit (held-out).
 
 Usage: python3 evaluate.py <clips.npz> <ckpt_dir> <out_json> [pitch]
@@ -73,22 +74,22 @@ if __name__ == "__main__":
     with torch.no_grad():
         tune_h = models["LN (training target)"](tune_x)
         test_h = {k: m(test_x) for k, m in models.items()}
-        decoders = {k: score.fit_decoder(m(dec_x), dec_x) for k, m in models.items()}
+        decoders = {k: score.fit_decoders(m(dec_x), dec_x, kinds) for k, m in models.items()}
     res = {"pitch": pitch, "n_test_clips": len(test_x), "cells": {"ON": int((kinds == 0).sum()), "OFF": int((kinds == 1).sum())},
-           "healthy": {k: {"decode_r": score.decode_r(decoders[k], test_h[k], test_x)} for k in models},
+           "healthy": {k: {n: v.item() for n, v in score.decode_all(decoders[k], test_h[k], test_x, kinds).items()} for k in models},
            "healthy_models_agree": score.match(test_h["subunit (held-out)"], test_h["LN (training target)"], kinds),
            "targets": {}}
-    print("healthy decode_r", res["healthy"], "models agree r", round(res["healthy_models_agree"]["r"], 3), flush=True)
+    print("healthy decode", res["healthy"], "models agree r", round(res["healthy_models_agree"]["r"], 3), flush=True)
 
     def report(name, rates, extra=None):
         row = dict(extra or {})
         for k in models:
             m = score.match(rates, test_h[k], kinds)
-            m["identify"] = identify(rates, test_h[k]); m["decode_r"] = score.decode_r(decoders[k], rates, test_x)
+            m["identify"] = identify(rates, test_h[k]); m["decode"] = {n: v.item() for n, v in score.decode_all(decoders[k], rates, test_x, kinds).items()}
             row[k] = m
         a, b = row["LN (training target)"], row["subunit (held-out)"]
-        print(f"  {name:10s} LN: r {a['r']:.2f} (ON {a['ON']['r']:.2f} OFF {a['OFF']['r']:.2f}) id {a['identify']:.2f} dec {a['decode_r']:.2f}"
-              f" | held-out: r {b['r']:.2f} (ON {b['ON']['r']:.2f} OFF {b['OFF']['r']:.2f}) id {b['identify']:.2f} dec {b['decode_r']:.2f}"
+        print(f"  {name:10s} LN: r {a['r']:.2f} (ON {a['ON']['r']:.2f} OFF {a['OFF']['r']:.2f}) id {a['identify']:.2f} dec {a['decode']['all']:.2f} (ON {a['decode']['ON']:.2f} OFF {a['decode']['OFF']:.2f})"
+              f" | held-out: r {b['r']:.2f} (ON {b['ON']['r']:.2f} OFF {b['OFF']['r']:.2f}) id {b['identify']:.2f} dec {b['decode']['all']:.2f} (ON {b['decode']['ON']:.2f} OFF {b['decode']['OFF']:.2f})"
               f" | {extra or ''}", flush=True)
         return row
 

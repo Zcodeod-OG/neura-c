@@ -1,9 +1,11 @@
 """Scores for how close treated-retina firing is to healthy firing. Rates are [b, T, n]; the first WARM bins are dropped."""
 import torch
 import torch.nn.functional as F
+import healthy
 
 WARM = 36       # 300 ms: filters and the encoder's memory fill up
 LAGS, SHIFT, RIDGE = 6, 4, 10.0     # decoder: 6 bins of firing predict the frame 4 bins before the newest
+CHANGE_TAU = 36                     # decoder target: the movie minus its 300 ms running average
 
 
 def match(treated, healthy, kinds):
@@ -31,7 +33,11 @@ def loss(treated, healthy, kinds, mse_weight=0.2):
     return total / 2
 
 
-# A linear decoder fitted on healthy firing stands in for a brain that expects the healthy code.
+# Linear decoders fitted on healthy firing stand in for a brain that expects the healthy code.
+# They rebuild what changed in the movie (the movie minus its 300 ms running average), because that is what
+# these cells signal: the fitted ON cell is fully transient, so a decoder of raw frames ignores ON cells
+# (ON-only 0.18 against OFF-only 0.60 on healthy firing) and would reward an encoder for serving OFF cells alone.
+# There are three decoders: all cells, ON cells only, OFF cells only.
 def features(rates):
     """[b, T, n] -> rows of LAGS consecutive bins, [b * (T - WARM - LAGS + 1), n * LAGS]."""
     r = rates[:, WARM:]
@@ -39,7 +45,7 @@ def features(rates):
 
 
 def frames_for(movie):
-    m = F.avg_pool2d(movie[:, WARM:], 2)
+    m = F.avg_pool2d((movie - healthy.lowpass(movie, CHANGE_TAU))[:, WARM:], 2)
     T = m.shape[1]
     return m[:, LAGS - 1 - SHIFT:T - SHIFT].flatten(2).flatten(0, 1)
 
@@ -64,3 +70,16 @@ def decode_corr(dec, rates, movie):
 
 def decode_r(dec, rates, movie):
     return decode_corr(dec, rates, movie).item()
+
+
+def fit_decoders(rates, movie, kinds):
+    return {"all": fit_decoder(rates, movie), "ON": fit_decoder(rates[:, :, kinds == 0], movie),
+            "OFF": fit_decoder(rates[:, :, kinds == 1], movie)}
+
+
+def decode_all(decs, rates, movie, kinds):
+    """Correlations for the three decoders, plus "split" = mean of the ON-only and OFF-only ones (tensors)."""
+    out = {"all": decode_corr(decs["all"], rates, movie), "ON": decode_corr(decs["ON"], rates[:, :, kinds == 0], movie),
+           "OFF": decode_corr(decs["OFF"], rates[:, :, kinds == 1], movie)}
+    out["split"] = (out["ON"] + out["OFF"]) / 2
+    return out

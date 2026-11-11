@@ -6,8 +6,8 @@ Training from scratch can settle on "all pixels off" (early random flashes fire 
 silence does), and can end below a hand-designed encoder. So every run starts with WARM_STEPS of imitating a
 hand-designed encoder, then trains through the simulator.
 
-With dec_weight > 0 the loss also asks that a linear decoder fitted on healthy firing can rebuild the movie
-from the treated firing (score.decode_corr).
+With dec_weight > 0 the loss also asks that linear decoders fitted on healthy firing, one reading ON cells
+and one reading OFF cells, can rebuild what changed in the movie from the treated firing (score.decode_all).
 
 Usage: python3 train.py <clips.npz> <rgc|bipolar> <out.pt> [pitch] [steps] [threads] [dec_weight]
 """
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     with torch.no_grad():
         val_h = h(val)
         dec_x = data.Clips(npz, "train", seed=6).sample(160)
-        decoder = score.fit_decoder(h(dec_x), dec_x)
+        decoder = score.fit_decoders(h(dec_x), dec_x, h.kinds)
     log, t0 = [], time.time()
     for step in range(1, steps + 1):
         x = clips.sample(12)
@@ -57,14 +57,14 @@ if __name__ == "__main__":
             rates = tr(enc(x, noise))
             l = score.loss(rates, target_rates, h.kinds)
             if dec_weight > 0:
-                l = l + dec_weight * (1 - score.decode_corr(decoder, rates, x))
+                l = l + dec_weight * (1 - score.decode_all(decoder, rates, x, h.kinds)["split"])
         opt.zero_grad(); l.backward(); opt.step(); sched.step()
         if step % 25 == 0 or step == steps:
             with torch.no_grad():
                 fr = enc(val)
                 vr = tr(fr)
                 m = score.match(vr, val_h, h.kinds)
-                m["dec"] = score.decode_r(decoder, vr, val)
+                m["dec"] = score.decode_all(decoder, vr, val, h.kinds)["split"].item()
             log.append({"step": step, "loss": l.item(), "val_r": m["r"], "val_dec": m["dec"], "lit": fr.mean().item()})
             print(step, f"loss {l.item():.3f} val r {m['r']:.3f} (ON {m['ON']['r']:.2f} OFF {m['OFF']['r']:.2f}) "
                   f"dec {m['dec']:.2f} lit {fr.mean().item():.2f} {time.time()-t0:.0f}s", flush=True)
