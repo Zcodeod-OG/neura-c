@@ -72,7 +72,8 @@ if __name__ == "__main__":
     dec_x = data.Clips(npz, "train", seed=6).sample(160)
     test_x = data.Clips(npz, "test", seed=123).sample(120, augment=False)
     models = {"LN (training target)": healthy.HealthyLN(), "subunit (held-out)": healthy.HealthySubunit()}
-    kinds = models["LN (training target)"].kinds
+    h0 = models["LN (training target)"]
+    kinds = h0.kinds
     with torch.no_grad():
         tune_h = models["LN (training target)"](tune_x)
         test_h = {k: m(test_x) for k, m in models.items()}
@@ -104,11 +105,23 @@ if __name__ == "__main__":
                 kw = tune(fn, grid, tune_x, tr, tune_h, kinds, pitch)
                 fr = fn(test_x, pitch, **kw)
                 rows[name] = report(name, tr(fr), {"settings": kw, "lit": fr.mean().item()})
-            for tag, label in (("", "learned"), ("_dec", "learned+dec")):
+            if target == "rgc":                 # map-aware hand-designed code, tuned on firing match plus decoding
+                best = None
+                for R, d, s, sub in itertools.product([0.8, 1.2, 1.6, 2.2], [0, 1, 2], [1.0, 1.5], [0.0, 0.08]):
+                    sign = E.sign_map(h0.centres, kinds, pitch, R)
+                    rt = tr(E.mapped(tune_x, pitch, sign, d, s, sub))
+                    sc = score.match(rt, tune_h, kinds)["r"] + score.decode_all(decoders["LN (training target)"], rt, tune_x, kinds)["all"].item()
+                    if best is None or sc > best[0]:
+                        best = (sc, {"radius": R, "delay": d, "sigma": s, "sub": sub})
+                kw = best[1]
+                fr = E.mapped(test_x, pitch, E.sign_map(h0.centres, kinds, pitch, kw["radius"]), kw["delay"], kw["sigma"], kw["sub"])
+                rows["mapped"] = report("mapped", tr(fr), {"settings": kw, "lit": fr.mean().item()})
+            for tag, label in (("", "learned"), ("_dec", "learned+dec"), ("_dec_map", "learned+map")):
                 path = os.path.join(ckpt_dir, f"{target}_p{pitch}{tag}{suffix}.pt")
                 if os.path.exists(path):
                     ck = torch.load(path)
-                    enc = E.Learned(pitch); enc.load_state_dict(ck["state"])
+                    enc = E.Learned(pitch, cell_maps=E.cell_maps(h0.centres, kinds) if ck.get("map") else None)
+                    enc.load_state_dict(ck["state"])
                     fr = torch.cat([enc(test_x[i:i + 24]) for i in range(0, len(test_x), 24)])
                     rows[label] = report(label, tr(fr), {"lit": fr.mean().item(), "train_steps": ck["log"][-1]["step"]})
         if target == "rgc":
