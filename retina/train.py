@@ -9,7 +9,7 @@ hand-designed encoder, then trains through the simulator.
 With dec_weight > 0 the loss also asks that linear decoders fitted on healthy firing, one reading ON cells
 and one reading OFF cells, can rebuild what changed in the movie from the treated firing (score.decode_all).
 
-Usage: python3 train.py <clips.npz> <rgc|bipolar> <out.pt> [pitch] [steps] [threads] [dec_weight] [membrane] [map]
+Usage: python3 train.py <clips.npz> <rgc|bipolar> <out.pt> [pitch] [steps] [threads] [dec_weight] [membrane] [map] [jitter]
 """
 import json
 import sys
@@ -34,6 +34,7 @@ if __name__ == "__main__":
     dec_weight = float(sys.argv[7]) if len(sys.argv) > 7 else 0.0
     membrane = float(sys.argv[8]) if len(sys.argv) > 8 else 0.75     # opsin spread; about 0.25 for a soma-targeted opsin
     use_map = len(sys.argv) > 9 and sys.argv[9] == "map"          # give the encoder the ON/OFF cell positions
+    jitter = int(sys.argv[10]) if len(sys.argv) > 10 else 0         # train with the pattern landing up to this many pixels off
     torch.manual_seed(0)
     torch.set_flush_denormal(True)          # decaying opsin activation otherwise reaches very slow tiny numbers
     clips = data.Clips(npz, "train", seed=0)
@@ -61,7 +62,15 @@ if __name__ == "__main__":
         else:
             done = (step - WARM_STEPS) / (steps - WARM_STEPS)
             noise = max(0.0, 1.0 - done / 0.6)                  # logistic noise on the logits, annealed to zero
-            rates = tr(enc(x, noise))
+            frames = enc(x, noise)
+            if jitter:
+                # The eye has moved: the pattern lands shifted on the retina. The cells should then fire as a
+                # healthy retina at that position would, so the target is the healthy response to the shifted movie.
+                dx, dy = (int(v) for v in torch.randint(-jitter, jitter + 1, (2,)))
+                frames = frames.roll((dy, dx), (-2, -1))
+                with torch.no_grad():
+                    target_rates = h(x.roll((dy * pitch, dx * pitch), (-2, -1)))
+            rates = tr(frames)
             l = score.loss(rates, target_rates, h.kinds, worst=0.5 if use_map else 0.0)
             if dec_weight > 0:
                 l = l + dec_weight * (1 - score.decode_all(decoder, rates, x, h.kinds)["split"])
@@ -75,4 +84,4 @@ if __name__ == "__main__":
             log.append({"step": step, "loss": l.item(), "val_r": m["r"], "val_dec": m["dec"], "lit": fr.mean().item()})
             print(step, f"loss {l.item():.3f} val r {m['r']:.3f} (ON {m['ON']['r']:.2f} OFF {m['OFF']['r']:.2f}) "
                   f"dec {m['dec']:.2f} lit {fr.mean().item():.2f} {time.time()-t0:.0f}s", flush=True)
-            torch.save({"state": enc.state_dict(), "pitch": pitch, "target": target, "dec_weight": dec_weight, "membrane": membrane, "map": use_map, "log": log}, out)
+            torch.save({"state": enc.state_dict(), "pitch": pitch, "target": target, "dec_weight": dec_weight, "membrane": membrane, "map": use_map, "jitter": jitter, "log": log}, out)
