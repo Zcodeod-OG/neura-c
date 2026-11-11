@@ -20,17 +20,18 @@ def match(treated, healthy, kinds):
     return out
 
 
-def loss(treated, healthy, kinds, mse_weight=0.2):
+def loss(treated, healthy, kinds, mse_weight=0.2, worst=0.0):
     """Training loss per cell type: one minus the correlation with healthy firing, plus a smaller squared-error
     term (normalised by the healthy variance) that sets the overall firing level. Squared error alone makes
-    "all pixels off" a trap, because early random flashes fire the cells more wrongly than silence does."""
-    total = 0.0
+    "all pixels off" a trap, because early random flashes fire the cells more wrongly than silence does.
+    `worst` > 0 mixes in the worse of the two cell types, so the encoder cannot serve one type and drop the other."""
+    parts = []
     for ti in range(2):
         a, b = treated[:, WARM:, kinds == ti], healthy[:, WARM:, kinds == ti]
         ac, bc = a - a.mean(), b - b.mean()
         r = (ac * bc).mean() / (ac.pow(2).mean().sqrt() * bc.pow(2).mean().sqrt() + 1e-3)
-        total = total + (1 - r) + mse_weight * (a - b).pow(2).mean() / b.var().detach()
-    return total / 2
+        parts.append((1 - r) + mse_weight * (a - b).pow(2).mean() / b.var().detach())
+    return (1 - worst) * (parts[0] + parts[1]) / 2 + worst * torch.maximum(parts[0], parts[1])
 
 
 # Linear decoders fitted on healthy firing stand in for a brain that expects the healthy code.

@@ -62,7 +62,7 @@ if __name__ == "__main__":
             done = (step - WARM_STEPS) / (steps - WARM_STEPS)
             noise = max(0.0, 1.0 - done / 0.6)                  # logistic noise on the logits, annealed to zero
             rates = tr(enc(x, noise))
-            l = score.loss(rates, target_rates, h.kinds)
+            l = score.loss(rates, target_rates, h.kinds, worst=0.5 if use_map else 0.0)
             if dec_weight > 0:
                 l = l + dec_weight * (1 - score.decode_all(decoder, rates, x, h.kinds)["split"])
         opt.zero_grad(); l.backward(); opt.step(); sched.step()
