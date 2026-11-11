@@ -9,7 +9,7 @@ hand-designed encoder, then trains through the simulator.
 With dec_weight > 0 the loss also asks that linear decoders fitted on healthy firing, one reading ON cells
 and one reading OFF cells, can rebuild what changed in the movie from the treated firing (score.decode_all).
 
-Usage: python3 train.py <clips.npz> <rgc|bipolar> <out.pt> [pitch] [steps] [threads] [dec_weight]
+Usage: python3 train.py <clips.npz> <rgc|bipolar> <out.pt> [pitch] [steps] [threads] [dec_weight] [membrane]
 """
 import json
 import sys
@@ -31,12 +31,13 @@ if __name__ == "__main__":
     steps = int(sys.argv[5]) if len(sys.argv) > 5 else 600
     torch.set_num_threads(int(sys.argv[6]) if len(sys.argv) > 6 else 4)
     dec_weight = float(sys.argv[7]) if len(sys.argv) > 7 else 0.0
+    membrane = float(sys.argv[8]) if len(sys.argv) > 8 else 0.75     # opsin spread; about 0.25 for a soma-targeted opsin
     torch.manual_seed(0)
     torch.set_flush_denormal(True)          # decaying opsin activation otherwise reaches very slow tiny numbers
     clips = data.Clips(npz, "train", seed=0)
     val = data.Clips(npz, "train", seed=99).sample(24)
     h = healthy.HealthyLN()
-    tr = treated.Treated(h, target, pitch=pitch)
+    tr = treated.Treated(h, target, pitch=pitch, membrane=membrane)
     enc = encoders.Learned(pitch)
     opt = torch.optim.Adam(enc.parameters(), 1e-3)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, steps)

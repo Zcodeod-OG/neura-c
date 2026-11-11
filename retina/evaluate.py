@@ -12,7 +12,7 @@ Scores:
                correlation with what changed in the movie (score.py)
 Everything is reported against HealthyLN (training target) and HealthySubunit (held-out).
 
-Usage: python3 evaluate.py <clips.npz> <ckpt_dir> <out_json> [pitch]
+Usage: python3 evaluate.py <clips.npz> <ckpt_dir> <out_json> [pitch] [membrane] [ckpt_suffix]
 """
 import itertools
 import json
@@ -64,6 +64,8 @@ def oracle(tr, target_rates, kinds, steps=300):
 if __name__ == "__main__":
     npz, ckpt_dir, out = sys.argv[1:4]
     pitch = int(sys.argv[4]) if len(sys.argv) > 4 else 2
+    membrane = float(sys.argv[5]) if len(sys.argv) > 5 else 0.75
+    suffix = sys.argv[6] if len(sys.argv) > 6 else ""          # checkpoint name suffix, e.g. _m25
     torch.manual_seed(0)
     torch.set_num_threads(4)
     tune_x = data.Clips(npz, "train", seed=5).sample(48)
@@ -75,7 +77,7 @@ if __name__ == "__main__":
         tune_h = models["LN (training target)"](tune_x)
         test_h = {k: m(test_x) for k, m in models.items()}
         decoders = {k: score.fit_decoders(m(dec_x), dec_x, kinds) for k, m in models.items()}
-    res = {"pitch": pitch, "n_test_clips": len(test_x), "cells": {"ON": int((kinds == 0).sum()), "OFF": int((kinds == 1).sum())},
+    res = {"pitch": pitch, "membrane": membrane, "n_test_clips": len(test_x), "cells": {"ON": int((kinds == 0).sum()), "OFF": int((kinds == 1).sum())},
            "healthy": {k: {n: v.item() for n, v in score.decode_all(decoders[k], test_h[k], test_x, kinds).items()} for k in models},
            "healthy_models_agree": score.match(test_h["subunit (held-out)"], test_h["LN (training target)"], kinds),
            "targets": {}}
@@ -95,7 +97,7 @@ if __name__ == "__main__":
 
     for target in ("rgc", "bipolar"):
         print(target, flush=True)
-        tr = treated.Treated(models["LN (training target)"], target, pitch=pitch)
+        tr = treated.Treated(models["LN (training target)"], target, pitch=pitch, membrane=membrane)
         rows = {}
         with torch.no_grad():
             for name, (fn, grid) in GRIDS.items():
@@ -103,7 +105,7 @@ if __name__ == "__main__":
                 fr = fn(test_x, pitch, **kw)
                 rows[name] = report(name, tr(fr), {"settings": kw, "lit": fr.mean().item()})
             for tag, label in (("", "learned"), ("_dec", "learned+dec")):
-                path = os.path.join(ckpt_dir, f"{target}_p{pitch}{tag}.pt")
+                path = os.path.join(ckpt_dir, f"{target}_p{pitch}{tag}{suffix}.pt")
                 if os.path.exists(path):
                     ck = torch.load(path)
                     enc = E.Learned(pitch); enc.load_state_dict(ck["state"])
